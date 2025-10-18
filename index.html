@@ -100,6 +100,9 @@
                     <i data-lucide="calendar" class="w-4 h-4 inline mr-1"></i> History
                 </button>
                 <button id="nav-achievements-btn" onclick="switchPage('achievements')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
+                    <i data-lucide="medal" class="w-4 h-4 inline mr-1"></i> Achievements
+                </button>
+                <button id="nav-progress-btn" onclick="switchPage('progress')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
                     <i data-lucide="trending-up" class="w-4 h-4 inline mr-1"></i> Progress
                 </button>
             </nav>
@@ -286,15 +289,32 @@
             </div>
         </div>
         
-        
         <div id="achievements-view" class="hidden">
             <div class="glass-base p-6 rounded-3xl shadow-2xl mb-8 bg-gray-800/30 border-gray-500/50">
-                <h1 class="text-2xl font-bold text-emerald-300 mb-6">Achievements & Metrics</h1>
-                <div id="achievements-container" class="space-y-6">
-                    
+                <h1 class="text-2xl font-bold text-emerald-300 mb-6">Trophy Case</h1>
+                <p class="text-gray-400 mb-6">Earn single-level achievements by hitting focus and task milestones.</p>
+                <div id="trophies-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 </div>
             </div>
         </div>
+        
+        <div id="progress-view" class="hidden">
+            <div class="glass-base p-6 rounded-3xl shadow-2xl mb-8 bg-gray-800/30 border-gray-500/50">
+                <h1 class="text-2xl font-bold text-indigo-300 mb-6">Cumulative Progress</h1>
+                <p class="text-gray-400 mb-6">Track your long-term statistics and compare performance week-over-week.</p>
+                <div id="metrics-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                </div>
+                
+                <h2 class="text-xl font-semibold text-gray-300 mt-8 mb-4 border-b border-gray-700 pb-2 flex items-center">
+                    <i data-lucide="bar-chart-2" class="w-5 h-5 mr-2"></i> Weekly Focus Breakdown
+                </h2>
+                <div id="weekly-breakdown-container" class="p-4 bg-gray-900/40 rounded-xl">
+                    <p class="text-center text-gray-400">Loading weekly data...</p>
+                </div>
+            </div>
+        </div>
+
 
     </div>
 
@@ -356,34 +376,66 @@
                 { id: 'other', name: 'Other', color: 'yellow' },
             ];
             
-            // --- NEW ACHIEVEMENT/PROGRESS CONFIG ---
+     // --- NEW ACHIEVEMENT/PROGRESS CONFIG (Flattened Structure) ---
             const ACHIEVEMENTS_CONFIG = [
+                // Focused Time Trophies (unit: 'minutes')
                 { 
-                    id: 'focused_hour', 
+                    id: 'focused_hour_easy', 
                     icon: 'hourglass', 
-                    name: 'Dedicated Focus', 
+                    name: 'First Step (1h)',
                     unit: 'minutes',
-                    description: 'Log focused time to unlock.',
-                    tiers: {
-                        easy: { goal: 60, name: 'First Step (1h)', color: 'text-amber-300' }, 
-                        medium: { goal: 300, name: 'Time Manager (5h)', color: 'text-gray-300' }, 
-                        hard: { goal: 1200, name: 'Flow State Master (20h)', color: 'text-indigo-400' }
-                    } 
+                    description: 'Log one hour of focused time.',
+                    goal: 60, // Single goal
+                    color: 'text-amber-300'
                 },
                 { 
-                    id: 'tasks_done', 
-                    icon: 'check-circle', 
-                    name: 'Task Hunter', 
-                    unit: 'tasks',
-                    description: 'Complete tasks to improve your score.',
-                    tiers: {
-                        easy: { goal: 5, name: 'Getting Things Done (5)', color: 'text-amber-300' }, 
-                        medium: { goal: 20, name: 'Productivity Pro (20)', color: 'text-gray-300' }, 
-                        hard: { goal: 50, name: 'Executioner (50)', color: 'text-indigo-400' }
-                    } 
+                    id: 'focused_hour_medium', 
+                    icon: 'hourglass', 
+                    name: 'Time Manager (5h)', 
+                    unit: 'minutes',
+                    description: 'Log five hours of focused time.',
+                    goal: 300, 
+                    color: 'text-gray-300'
                 },
-            ];
+                { 
+                    id: 'focused_hour_hard', 
+                    icon: 'hourglass', 
+                    name: 'Flow State Master (20h)', 
+                    unit: 'minutes',
+                    description: 'Log twenty hours of focused time.',
+                    goal: 1200, 
+                    color: 'text-indigo-400'
+                },
 
+                // Tasks Done Trophies (unit: 'tasks')
+                { 
+                    id: 'tasks_done_easy', 
+                    icon: 'check-circle', 
+                    name: 'Getting Things Done (5)', 
+                    unit: 'tasks',
+                    description: 'Complete 5 tasks.',
+                    goal: 5, 
+                    color: 'text-amber-300'
+                },
+                { 
+                    id: 'tasks_done_medium', 
+                    icon: 'check-circle', 
+                    name: 'Productivity Pro (20)', 
+                    unit: 'tasks',
+                    description: 'Complete 20 tasks.',
+                    goal: 20, 
+                    color: 'text-gray-300'
+                },
+                { 
+                    id: 'tasks_done_hard', 
+                    icon: 'check-circle', 
+                    name: 'Executioner (50)', 
+                    unit: 'tasks',
+                    description: 'Complete 50 tasks.',
+                    goal: 50, 
+                    color: 'text-indigo-400'
+                }
+            ];
 
             const DEFAULT_STATE = {
                 isRunning: false,
@@ -412,14 +464,14 @@
                 overallTime: 0,
                 monthlyTime: 0,
                 weeklyTime: 0,
+                prevMonthlyTime: 0, 
+                prevWeeklyTime: 0,
+                dailyTimeInWeek: Array(7).fill(0), // Focus time for each day of the current week (Mon-Sun)
                 tasksCompleted: 0,
                 totalTasks: 0,
                 efficiency: 0,
+                avgDailyHours: 0,
                 achievements: {},
-                // NEW Stats for requested features
-                prevMonthlyTime: 0, // Time in the month before the current one
-                dailyTimeInWeek: Array(7).fill(0), // Focus time for each day of the current week (Mon-Sun)
-                dailyTimeInPreviousWeek: Array(7).fill(0), // Focus time for each day of the previous week (Mon-Sun)
             };
 
 
@@ -449,11 +501,13 @@
                 timerView: document.getElementById('timer-view'),
                 tasksView: document.getElementById('tasks-view'),
                 historyView: document.getElementById('history-view'), 
-                achievementsView: document.getElementById('achievements-view'), // NEW
+                achievementsView: document.getElementById('achievements-view'), 
+                progressView: document.getElementById('progress-view'), // NEW
                 navTimerBtn: document.getElementById('nav-timer-btn'),
                 navTasksBtn: document.getElementById('nav-tasks-btn'),
                 navHistoryBtn: document.getElementById('nav-history-btn'),
-                navAchievementsBtn: document.getElementById('nav-achievements-btn'), // NEW
+                navAchievementsBtn: document.getElementById('nav-achievements-btn'), 
+                navProgressBtn: document.getElementById('nav-progress-btn'), // NEW
                 
                 // Tasks UI elements
                 taskInputNew: document.getElementById('new-task-input'),
@@ -463,8 +517,10 @@
                 dateSelector: document.getElementById('date-selector'),
                 dailySummaryContainer: document.getElementById('daily-summary-container'),
                 
-                // Achievements UI elements
-                achievementsContainer: document.getElementById('achievements-container'), // NEW
+                // Achievements UI elements (updated names)
+                trophiesContainer: document.getElementById('trophies-container'),
+                metricsContainer: document.getElementById('metrics-container'), // NEW
+                weeklyBreakdownContainer: document.getElementById('weekly-breakdown-container'), // NEW
                 
                 // Fullscreen Clock elements
                 fullscreenClockModal: document.getElementById('fullscreen-clock-modal'),
@@ -556,10 +612,44 @@
                 const minutes = totalMinutes % 60;
                 return `${hours}h ${minutes}m`;
             };
+            
+            // Helper for weekly/monthly comparisons
+            function formatComparison(current, previous, unit) {
+                if (previous === 0) {
+                    return 'No previous data';
+                }
+                const change = current - previous;
+                const percentChange = (change / previous) * 100;
+                const formattedPercent = Math.abs(percentChange).toFixed(0);
+
+                let icon = 'minus'; 
+                let color = 'text-gray-400';
+                let direction = 'No change';
+
+                if (Math.abs(percentChange) < 1) { // Treat very small change as 'No change'
+                     return `<span class="text-gray-400">Same as last ${unit}</span>`;
+                }
+                
+                if (percentChange > 0) {
+                    icon = 'arrow-up-right';
+                    color = 'text-emerald-400';
+                    direction = 'Up';
+                } else if (percentChange < 0) {
+                    icon = 'arrow-down-right';
+                    color = 'text-red-400';
+                    direction = 'Down';
+                } 
+
+                return `<span class="${color} flex items-center">
+                            <i data-lucide="${icon}" class="w-4 h-4 mr-1"></i> 
+                            ${direction} ${formattedPercent}%
+                        </span>`;
+            }
 
             /** Extracts the date part (YYYY-MM-DD) from an ISO string. */
             function getFormattedDate(isoString) {
                 if (!isoString) return null;
+                // Safely handles both 'YYYY-MM-DDTHH:MM:SS...' and 'YYYY-MM-DD'
                 return isoString.split('T')[0];
             }
             
@@ -611,6 +701,9 @@
             
             function calculateAllStats() {
                 const now = new Date();
+                // Set the current date to midnight for consistent comparison (Local time)
+                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                
                 const startOfWeek = getPeriodStart('week', now).getTime();
                 const startOfPrevWeek = getPeriodStart('prevWeek', now).getTime();
                 const startOfMonth = getPeriodStart('month', now).getTime();
@@ -655,25 +748,26 @@
                 const tasksCompleted = state.tasks.filter(t => t.completed).length;
                 const efficiency = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
                 
-                // 3. Calculate Overall Average Study Hours (approximation)
+                // 3. Calculate Overall Average Study Hours
                 const firstSessionTimestamp = state.sessions.length > 0 
                     ? Math.min(...state.sessions.map(s => new Date(s.timestamp).getTime()))
                     : Date.now();
-                const daysSinceStart = Math.ceil((Date.now() - firstSessionTimestamp) / (1000 * 3600 * 24)) || 1;
+                
+                // Calculate days since the first session, rounding up to 1 if it's the first day
+                const daysSinceStart = Math.ceil((startOfToday - new Date(firstSessionTimestamp).setHours(0,0,0,0)) / (1000 * 3600 * 24)) || 1;
                 const avgDailyHours = overallTime / 3600 / daysSinceStart;
-
 
                 // 4. Update stats object
                 stats.overallTime = overallTime;
                 stats.monthlyTime = monthlyTime;
                 stats.weeklyTime = weeklyTime;
-                stats.prevMonthlyTime = prevMonthlyTime; // NEW
+                stats.prevMonthlyTime = prevMonthlyTime; 
                 stats.prevWeeklyTime = prevWeeklyTime;
-                stats.dailyTimeInWeek = dailyTimeInWeek; // NEW
+                stats.dailyTimeInWeek = dailyTimeInWeek; 
                 stats.tasksCompleted = tasksCompleted;
                 stats.totalTasks = totalTasks;
                 stats.efficiency = efficiency;
-                stats.avgDailyHours = avgDailyHours; // NEW
+                stats.avgDailyHours = avgDailyHours; 
                 
                 // 5. Check Achievements
                 stats.achievements = checkAchievementStatus(overallTime, tasksCompleted);
@@ -686,7 +780,6 @@
                 const overallTimeMinutes = Math.floor(overallTimeSeconds / 60);
 
                 ACHIEVEMENTS_CONFIG.forEach(ach => {
-                    const tiers = ach.tiers;
                     let progressValue;
                     
                     if (ach.unit === 'minutes') {
@@ -695,42 +788,85 @@
                         progressValue = tasksCompletedCount;
                     }
                     
-                    let currentTier = 'none';
+                    const isComplete = progressValue >= ach.goal;
                     
-                    if (progressValue >= tiers.hard.goal) {
-                        currentTier = 'hard';
-                    } else if (progressValue >= tiers.medium.goal) {
-                        currentTier = 'medium';
-                    } else if (progressValue >= tiers.easy.goal) {
-                        currentTier = 'easy';
-                    }
-
-                    let nextTierGoal = 0;
-                    let nextTierName = 'Easy';
-                    
-                    if (currentTier === 'none') {
-                        nextTierGoal = tiers.easy.goal;
-                        nextTierName = tiers.easy.name;
-                    } else if (currentTier === 'easy') {
-                        nextTierGoal = tiers.medium.goal;
-                        nextTierName = tiers.medium.name;
-                    } else if (currentTier === 'medium') {
-                        nextTierGoal = tiers.hard.goal;
-                        nextTierName = tiers.hard.name;
-                    }
+                    // Progress is calculated towards the single goal
+                    const percentage = ach.goal > 0 ? Math.min(100, (progressValue / ach.goal) * 100) : 100;
 
                     status[ach.id] = {
                         progress: progressValue,
-                        currentTier: currentTier,
-                        nextTierGoal: nextTierGoal,
-                        nextTierName: nextTierName,
-                        isComplete: currentTier === 'hard',
-                        percentage: nextTierGoal > 0 ? Math.min(100, (progressValue / nextTierGoal) * 100) : 100
+                        goal: ach.goal, // Store the single goal
+                        isComplete: isComplete,
+                        percentage: percentage,
                     };
                 });
                 return status;
             }
+            
+            // --- BROWN NOISE GENERATION FIX (Bug 2) ---
+            
+            /** Creates a brown noise AudioBufferSourceNode. */
+            function createBrownNoiseGenerator() {
+                const bufferSize = 4096;
+                const sampleRate = audioContext.sampleRate;
+                const noiseBuffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                let lastOut = 0.0;
+                
+                // Brown/Red noise generation (integrate white noise)
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    output[i] = (lastOut + (0.02 * white)) / 1.02; // Simple integration
+                    lastOut = output[i];
+                    output[i] *= 3.5; // Apply volume boost
+                }
+                
+                const source = audioContext.createBufferSource();
+                source.buffer = noiseBuffer;
+                source.loop = true;
+                
+                // Create a GainNode for volume control (optional but good practice)
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = 0.05; // Set volume low, brown noise is loud
+                
+                source.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                return source;
+            }
+            
+            /** Toggles the playback of brown noise. (Bug 2 Fix) */
+            window.toggleBrownNoise = async () => {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
 
+                if (isNoisePlaying) {
+                    // Stop the noise
+                    if (brownNoiseGenerator) {
+                        try {
+                            // Ensure the node is stopped and disconnected
+                            brownNoiseGenerator.stop();
+                            brownNoiseGenerator.disconnect();
+                        } catch (e) {
+                            console.error("Error stopping brown noise:", e);
+                        }
+                        brownNoiseGenerator = null; // Clear the reference
+                    }
+                } else {
+                    // Start the noise
+                    if (audioContext.state === 'suspended') {
+                        await audioContext.resume();
+                    }
+                    // Create a new generator and start it
+                    brownNoiseGenerator = createBrownNoiseGenerator();
+                    brownNoiseGenerator.start();
+                }
+
+                isNoisePlaying = !isNoisePlaying;
+                renderUI();
+            };
+            
             // --- POMODORO LOGIC ---
 
             /** Toggles Pomodoro mode on/off. */
@@ -855,25 +991,26 @@
 
                 clearInterval(intervalId);
                 state.isRunning = false;
-                
+
                 if (state.isPomodoroActive) {
                     // For Pomodoro, stopping just pauses the countdown.
-                } else {
+                } else { 
                     // For Free-Form, check duration and log.
-                    if (state.timeElapsed >= 5) { 
+                    if (state.timeElapsed >= 5) {
                         logSession();
                     } else {
+                        // If session is too short, reset goal and time but don't log.
                         D.taskInput.value = '';
                         state.timeElapsed = 0;
                     }
                 }
-                
                 renderUI();
                 saveState();
             }
-            
+
             function resetTimer() {
                 if (state.isRunning) stopTimer();
+
                 clearInterval(intervalId);
                 state.timeElapsed = 0;
                 state.startTime = null;
@@ -884,25 +1021,24 @@
                 state.isPomodoroActive = false;
                 state.pomodoroMode = 'focus';
                 state.pomodoroTimeRemaining = POMODORO_FOCUS_SECONDS;
-                
-                // Stop brown noise if it's playing
+
+                // Stop brown noise if it's playing (Uses Bug 2 Fix)
                 if (isNoisePlaying) {
                     window.toggleBrownNoise();
                 }
-                
+
                 renderUI();
                 saveState();
                 calculateAllStats(); // Recalculate stats
             }
-            
+
             function logSession(fixedDuration = null) {
                 const subject = SUBJECTS.find(s => s.id === state.currentSubject);
-
                 // Determine duration: Use fixedDuration (for Pomodoro focus) or elapsed time (for free-form)
                 const duration = fixedDuration !== null ? fixedDuration : Math.floor(state.timeElapsed);
 
                 // Only log if the session was at least 5 seconds long (or a full Pomodoro block)
-                if (duration < 5) return; 
+                if (duration < 5 && fixedDuration === null) return;
 
                 const sessionLog = {
                     id: Date.now(),
@@ -912,20 +1048,19 @@
                     goal: D.taskInput.value.trim() || 'No Goal Set',
                     timestamp: new Date().toISOString(),
                 };
-                
+
                 // --- STREAK LOGIC ---
                 const previousTotalFocus = state.totalFocusTime;
                 state.totalFocusTime += sessionLog.durationSeconds;
-                
                 const previousStreakCount = Math.floor(previousTotalFocus / STREAK_GOAL_SECONDS);
-                
+
                 // Check if we crossed a 10-hour boundary
                 if (state.totalFocusTime >= STREAK_GOAL_SECONDS * (previousStreakCount + 1)) {
                     state.streakCount = Math.floor(state.totalFocusTime / STREAK_GOAL_SECONDS);
                 }
-                
+
                 // Add session log
-                state.sessions.unshift(sessionLog); 
+                state.sessions.unshift(sessionLog);
                 state.sessions = state.sessions.slice(0, 50); // Keep max 50 recent sessions
 
                 // Reset timer UI state (only free-form timer)
@@ -934,10 +1069,10 @@
                     state.startTime = null;
                 }
                 // Goal input is reset after any successful log
-                D.taskInput.value = '';
-                
+                D.taskInput.value = ''; 
+
                 // Recalculate stats for Achievements/Progress
-                calculateAllStats(); 
+                calculateAllStats();
                 renderHistory();
             }
 
@@ -963,14 +1098,14 @@
                 D.timerView.classList.add('hidden');
                 D.tasksView.classList.add('hidden');
                 D.historyView.classList.add('hidden');
-                D.achievementsView.classList.add('hidden'); // NEW
+                D.achievementsView.classList.add('hidden');
+                D.progressView.classList.add('hidden'); // NEW
 
                 // Reset nav button styles
-                [D.navTimerBtn, D.navTasksBtn, D.navHistoryBtn, D.navAchievementsBtn].forEach(btn => {
+                [D.navTimerBtn, D.navTasksBtn, D.navHistoryBtn, D.navAchievementsBtn, D.navProgressBtn].forEach(btn => { // Updated list
                     btn.classList.remove('bg-indigo-600');
                     btn.classList.add('bg-gray-700/50');
                 });
-
 
                 switch (state.currentPage) {
                     case 'timer':
@@ -990,45 +1125,47 @@
                         D.navHistoryBtn.classList.add('bg-indigo-600');
                         renderHistoryView(); // Initial render for history view
                         break;
-                    case 'achievements': // NEW
+                    case 'achievements': 
                         D.achievementsView.classList.remove('hidden');
                         D.navAchievementsBtn.classList.remove('bg-gray-700/50');
                         D.navAchievementsBtn.classList.add('bg-indigo-600');
-                        renderAchievements(); 
+                        renderAchievements(); // Renders trophies
+                        break;
+                    case 'progress': // NEW
+                        D.progressView.classList.remove('hidden');
+                        D.navProgressBtn.classList.remove('bg-gray-700/50');
+                        D.navProgressBtn.classList.add('bg-indigo-600');
+                        renderProgress(); // Renders metrics
                         break;
                 }
-                
                 renderUI();
             }
 
             // --- STREAK RENDERING ---
+
             function renderStreakProgress() {
                 const totalFocus = state.totalFocusTime;
                 const currentStreakGoalStart = state.streakCount * STREAK_GOAL_SECONDS;
                 const progressInGoal = totalFocus - currentStreakGoalStart;
-                
                 const percentage = Math.min(100, (progressInGoal / STREAK_GOAL_SECONDS) * 100);
                 const offset = CIRCLE_CIRCUMFERENCE - (percentage / 100) * CIRCLE_CIRCUMFERENCE;
-                
+
                 if (D.streakProgressBar) {
                     D.streakProgressBar.style.strokeDashoffset = offset;
                 }
                 if (D.streakProgressPercent) {
                     D.streakProgressPercent.textContent = `${Math.floor(percentage)}%`;
                 }
-
                 if (D.streakCount) {
                     D.streakCount.textContent = state.streakCount.toString();
                 }
-                
                 if (D.nextStreakInfo) {
                     const remainingSeconds = STREAK_GOAL_SECONDS - progressInGoal;
-                    const displayRemaining = Math.max(0, remainingSeconds); 
-                    const remainingTimeStr = formatTime(displayRemaining, true); 
+                    const displayRemaining = Math.max(0, remainingSeconds);
+                    const remainingTimeStr = formatTime(displayRemaining, true);
                     D.nextStreakInfo.textContent = `Next streak at ${state.streakCount + 1}: ${remainingTimeStr} remaining`;
                 }
             }
-
 
             /** Updates the timer, controls, and noise button states. */
             function renderUI() {
@@ -1038,18 +1175,15 @@
                 // --- TIMER DISPLAY LOGIC (Handles Pomodoro Countdown) ---
                 let timeToDisplay = state.isPomodoroActive ? state.pomodoroTimeRemaining : state.timeElapsed;
                 const timeStr = formatTime(timeToDisplay, true);
-                
                 const subjectColorClass = getSubjectColorClass(subject.id);
-                
+
                 // Update main title based on mode
                 if (state.isPomodoroActive) {
-                    D.timerTitle.textContent = state.pomodoroMode === 'focus' 
-                        ? 'Pomodoro Focus (55 min)' 
-                        : 'Pomodoro Break (5 min)';
+                    D.timerTitle.textContent = state.pomodoroMode === 'focus' ? 'Pomodoro Focus (55 min)' : 'Pomodoro Break (5 min)';
                 } else {
                     D.timerTitle.textContent = 'Focused Subject Tracker';
                 }
-                
+
                 // Apply break color (red) if in break mode, otherwise use subject color
                 let displayColorClass = subjectColorClass;
                 if (state.isPomodoroActive && state.pomodoroMode === 'break') {
@@ -1059,17 +1193,16 @@
                 // Update main display
                 D.timeDisplay.textContent = timeStr;
                 D.timeDisplay.className = `text-7xl lg:text-8xl font-extrabold tabular-nums tracking-tighter ${displayColorClass} transition-colors`;
-                
+
                 // Update fullscreen display if visible
                 if (!D.fullscreenClockModal.classList.contains('hidden')) {
                     D.fullscreenTimeDisplay.textContent = timeStr;
                     D.fullscreenTimeDisplay.className = `text-[12rem] lg:text-[18rem] xl:text-[25rem] font-extrabold tabular-nums tracking-tighter ${displayColorClass.replace('text-', 'text-')} transition-colors`;
-                    
-                    D.fullscreenSubjectGoal.textContent = state.isPomodoroActive
-                        ? (state.pomodoroMode === 'focus' ? `${subject.name} | Goal: ${D.taskInput.value.trim() || 'Focus Goal'}` : 'BREAK TIME - STAND UP!')
+                    D.fullscreenSubjectGoal.textContent = state.isPomodoroActive 
+                        ? (state.pomodoroMode === 'focus' ? `${subject.name} | Goal: ${D.taskInput.value.trim() || 'Focus Goal'}` : 'BREAK TIME - STAND UP!') 
                         : `${subject.name} | ${D.taskInput.value.trim() || 'Focus Goal'}`;
                 }
-                
+
                 // Input/Selector Control
                 D.taskInput.disabled = isRunning || state.isPomodoroActive;
                 D.subjectSelector.querySelectorAll('input[name="subject"]').forEach(radio => {
@@ -1078,18 +1211,16 @@
                         radio.checked = true;
                     }
                 });
-                
+
                 // Start/Pause Button
-                D.startPauseBtn.innerHTML = isRunning
-                    ? '<i data-lucide="square" class="w-6 h-6"></i>'
-                    : '<i data-lucide="play" class="w-6 h-6"></i>';
+                D.startPauseBtn.innerHTML = isRunning ? '<i data-lucide="square" class="w-6 h-6"></i>' : '<i data-lucide="play" class="w-6 h-6"></i>';
                 D.startPauseBtn.className = `p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 ${
                     isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
                 }`;
-                
+
                 // Reset Button: disabled if running, or if free-form time is 0 AND pomodoro is inactive
                 D.resetBtn.disabled = isRunning || (!state.isPomodoroActive && state.timeElapsed === 0);
-                
+
                 // Pomodoro Button
                 D.pomodoroBtn.className = `p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 ${
                     state.isPomodoroActive ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-700/50 hover:bg-gray-600/70'
@@ -1098,654 +1229,433 @@
                     ? '<i data-lucide="zap" class="w-6 h-6"></i>' // Zap icon for active
                     : '<i data-lucide="timer" class="w-6 h-6"></i>'; // Timer icon for inactive
 
-
                 // Fullscreen button is disabled when timer is at 0 (and not in a countdown)
                 const isTimerEmpty = !state.isPomodoroActive && state.timeElapsed === 0;
                 D.fullscreenBtn.disabled = isTimerEmpty;
                 D.fullscreenBtn.classList.toggle('opacity-50', isTimerEmpty);
                 D.fullscreenBtn.classList.toggle('cursor-not-allowed', isTimerEmpty);
 
-
+                // Noise Button (Uses Bug 2 Fix logic)
                 D.noiseBtn.className = `p-2 rounded-full transition-colors ${
                     isNoisePlaying ? 'bg-amber-500 text-black hover:bg-amber-400' : 'text-gray-400 hover:bg-white/10'
                 }`;
                 D.noiseBtn.innerHTML = isNoisePlaying 
-                    ? '<i data-lucide="volume-2" class="w-6 h-6"></i>'
+                    ? '<i data-lucide="volume-2" class="w-6 h-6"></i>' 
                     : '<i data-lucide="volume-x" class="w-6 h-6"></i>';
 
                 renderStreakProgress();
                 window.createLucideIcons();
-                
                 state.sessionGoal = D.taskInput.value.trim();
             }
-            
+
             // --- SUBJECT & HISTORY RENDERING ---
-            
+
             function setupSubjectSelector() {
+                // FIX 1: Removed inline style from label to rely purely on CSS checked selector.
                 D.subjectSelector.innerHTML = SUBJECTS.map(subject => `
-                    <input 
-                        type="radio" 
-                        id="sub-${subject.id}" 
-                        name="subject" 
-                        value="${subject.id}" 
-                        class="hidden subject-radio"
-                        ${state.currentSubject === subject.id ? 'checked' : ''}
-                    />
-                    <label 
-                        for="sub-${subject.id}" 
-                        class="block w-full text-center py-2 px-1 rounded-xl cursor-pointer text-sm font-semibold transition-colors border border-gray-700/50 text-gray-400 hover:bg-white/10"
-                        style="background-color: ${state.currentSubject === subject.id ? '#4f46e5' : ''}; color: ${state.currentSubject === subject.id ? '#fff' : ''};"
-                    >
+                    <input type="radio" id="sub-${subject.id}" name="subject" value="${subject.id}" class="hidden subject-radio" ${state.currentSubject === subject.id ? 'checked' : ''} />
+                    <label for="sub-${subject.id}" class="block w-full text-center py-2 px-1 rounded-xl cursor-pointer text-sm font-semibold transition-colors border border-gray-700/50 text-gray-400 hover:bg-white/10">
                         ${subject.name}
                     </label>
                 `).join('');
-
+                
+                // Add event listeners to update state when a subject is selected
                 D.subjectSelector.querySelectorAll('input[name="subject"]').forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        if (!state.isRunning && !state.isPomodoroActive) {
-                            state.currentSubject = e.target.value;
-                            setupSubjectSelector();
-                            renderUI();
-                            saveState();
-                        } else {
-                            // Use custom modal instead of alert
-                            const modal = D.detailsModal;
-                            D.modalContent.textContent = "Cannot change subject while the timer is running or in Pomodoro mode. Stop the timer first.";
-                            modal.classList.remove('hidden');
-                            
-                            // Revert the radio button to the previous state
-                            e.target.checked = state.currentSubject === e.target.value;
-                        }
+                    radio.addEventListener('change', (event) => {
+                        state.currentSubject = event.target.value;
+                        saveState();
+                        renderUI(); 
                     });
                 });
             }
-            
+
             function renderHistory() {
-                // This function updates the RECENT SESSIONS list on the Timer tab
-                if (state.sessions.length === 0) {
-                    D.historyList.innerHTML = '';
+                D.historyList.innerHTML = '';
+                const sessionsToShow = state.sessions.slice(0, 10);
+
+                if (sessionsToShow.length === 0) {
                     D.noHistory.classList.remove('hidden');
                     return;
                 }
                 D.noHistory.classList.add('hidden');
 
-                D.historyList.innerHTML = state.sessions.map(session => {
-                    const subject = SUBJECTS.find(s => s.id === session.subjectId);
-                    const color = subject ? subject.color : 'gray';
-                    // Use dynamic Tailwind class for background color based on the subject's primary color
-                    const colorClass = `bg-${color}-500`;
-                    
-                    return `
-                        <div class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600/50">
-                            <div class="flex items-center space-x-3 truncate">
-                                <span class="w-2 h-2 rounded-full ${colorClass}"></span>
-                                <span class="text-sm font-medium truncate">${session.subject}: ${session.goal}</span>
+                sessionsToShow.forEach(session => {
+                    const duration = formatMinutes(session.durationSeconds);
+                    const subjectClass = getSubjectColorClass(session.subjectId).replace('text-', 'border-');
+                    const html = `
+                        <div onclick="window.showSessionDetails(${session.id})" class="flex items-center justify-between p-3 bg-gray-700/50 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors border-l-4 ${subjectClass}">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold truncate text-white">${session.subject}: ${session.goal}</p>
+                                <p class="text-xs text-gray-400">${new Date(session.timestamp).toLocaleTimeString()} · ${duration}</p>
                             </div>
-                            <div class="flex items-center space-x-3 flex-shrink-0">
-                                <span class="text-xs text-gray-400 tabular-nums">${formatTime(session.durationSeconds, false)}</span>
-                                <button onclick="viewDetails(${session.id})" class="text-gray-400 hover:text-indigo-400 transition-colors">
-                                    <i data-lucide="eye" class="w-4 h-4"></i>
-                                </button>
-                            </div>
+                            <i data-lucide="chevrons-right" class="w-4 h-4 text-gray-400 flex-shrink-0 ml-4"></i>
                         </div>
                     `;
-                }).join('');
-                window.createLucideIcons();
-            }
-
-            // --- DAILY HISTORY LOGIC ---
-
-            /** Gets a sorted list of unique YYYY-MM-DD strings from sessions. */
-            function getUniqueDays() {
-                const uniqueDays = new Set();
-                state.sessions.forEach(session => {
-                    const dateKey = getFormattedDate(session.timestamp);
-                    if (dateKey) uniqueDays.add(dateKey);
+                    D.historyList.insertAdjacentHTML('beforeend', html);
                 });
-                return Array.from(uniqueDays).sort().reverse(); // Sort descending (newest first)
             }
-
-            /** Renders the History view setup (date selector and initial summary) */
+            
             function renderHistoryView() {
-                const uniqueDays = getUniqueDays();
-                D.dateSelector.innerHTML = '';
+                // 1. Populate the date selector
+                const sessionDates = state.sessions.map(s => getFormattedDate(s.timestamp));
                 
-                if (uniqueDays.length === 0) {
-                    D.dateSelector.innerHTML = '<option value="">No sessions logged</option>';
-                    D.dailySummaryContainer.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">No sessions logged yet.</p>';
+                // Collect completion dates from tasks (Bug 3 Fix)
+                const taskDates = state.tasks
+                    .filter(t => t.completed && t.completedAt)
+                    .map(t => getFormattedDate(t.completedAt));
+                    
+                const allDates = [...sessionDates, ...taskDates].filter(d => d !== null);
+                const uniqueDates = [...new Set(allDates)].sort().reverse();
+
+                // 2. Clear and populate the selector
+                D.dateSelector.innerHTML = '';
+                if (uniqueDates.length === 0) {
+                    D.dateSelector.innerHTML = '<option value="">No sessions or tasks logged</option>';
+                    D.dailySummaryContainer.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">Select a date above to view your summary.</p>';
                     return;
                 }
                 
-                // Find today's date for display
-                const todayKey = getFormattedDate(new Date().toISOString());
+                D.dateSelector.innerHTML = uniqueDates.map(dateKey => 
+                    `<option value="${dateKey}">${formatDateForDisplay(dateKey)}</option>`
+                ).join('');
 
-                uniqueDays.forEach(day => {
-                    const displayDate = formatDateForDisplay(day);
-                    const option = document.createElement('option');
-                    option.value = day;
-                    option.textContent = day === todayKey ? `Today (${displayDate})` : displayDate;
-                    D.dateSelector.appendChild(option);
-                });
-                
-                // Automatically show the summary for the latest day
-                renderDailySummary(uniqueDays[0]);
-                D.dateSelector.value = uniqueDays[0];
+                // 3. Render the summary for the currently selected date (or the latest one)
+                const selectedDate = D.dateSelector.value || uniqueDates[0];
+                renderDailySummary(selectedDate);
             }
-
-            /** Aggregates and renders the summary for the given day (YYYY-MM-DD). */
+            
+            /** Renders the session and task summary for a selected date. (Bug 3 Fix) */
             function renderDailySummary(dateKey) {
                 if (!dateKey) {
-                    D.dailySummaryContainer.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">Select a day to view its summary.</p>';
+                    D.dailySummaryContainer.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">Select a date above to view your summary.</p>';
                     return;
                 }
 
-                // 1. Filter sessions for the selected day
+                // 1. Filter and summarize sessions
                 const dailySessions = state.sessions.filter(s => getFormattedDate(s.timestamp) === dateKey);
+                let totalDailyFocusSeconds = dailySessions.reduce((sum, s) => sum + s.durationSeconds, 0);
 
-                // 2. Aggregate data
-                const totalDailyTime = dailySessions.reduce((sum, session) => sum + session.durationSeconds, 0);
-                const timePerSubject = dailySessions.reduce((acc, session) => {
-                    acc[session.subjectId] = (acc[session.subjectId] || 0) + session.durationSeconds;
-                    return acc;
-                }, {});
-
-                // 3. Filter tasks completed on that day
-                const completedDailyTasks = state.tasks.filter(t => t.completed && getFormattedDate(t.completedDate) === dateKey);
-
-                // 4. Filter currently incomplete tasks
-                const incompleteTasks = state.tasks.filter(t => !t.completed);
-
-                // 5. Start rendering HTML
-                let summaryHtml = `
-                    <div class="p-4 bg-indigo-900/40 rounded-xl border border-indigo-700/50">
-                        <h3 class="text-lg font-semibold text-indigo-300 flex items-center mb-1">
-                            <i data-lucide="chevrons-right-up" class="w-5 h-5 mr-2"></i>
-                            Total Focus Time
-                        </h3>
-                        <p class="text-4xl font-extrabold tabular-nums">${formatTime(totalDailyTime, true)}</p>
-                    </div>
-
-                    <div class="p-4 bg-gray-700/30 rounded-xl border border-gray-600/50">
-                        <h3 class="text-lg font-semibold text-gray-300 flex items-center mb-3">
-                            <i data-lucide="pie-chart" class="w-5 h-5 mr-2"></i>
-                            Time Distribution by Subject
-                        </h3>
-                        <div class="space-y-2">
-                `;
-
-                // Add subject rows
-                const subjectRows = Object.entries(timePerSubject).map(([subjectId, duration]) => {
-                    const subject = SUBJECTS.find(s => s.id === subjectId);
-                    const color = subject ? subject.color : 'gray';
-                    // Use dynamic Tailwind class for background color based on the subject's primary color
-                    const colorClass = `text-${color}-400`;
-                    let bgColorClass = 'bg-gray-500'; // Default
-                    if (color === 'indigo') bgColorClass = 'bg-indigo-500';
-                    if (color === 'emerald') bgColorClass = 'bg-emerald-500';
-                    if (color === 'sky') bgColorClass = 'bg-sky-500';
-                    if (color === 'yellow') bgColorClass = 'bg-yellow-500';
-
-
+                const sessionListHTML = dailySessions.map(session => {
+                    const duration = formatMinutes(session.durationSeconds);
+                    const subjectClass = getSubjectColorClass(session.subjectId).replace('text-', 'border-');
                     return `
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="flex items-center ${colorClass} font-medium">
-                                <span class="w-3 h-3 rounded-full ${bgColorClass} mr-2"></span>
-                                ${subject ? subject.name : 'Unknown'}
-                            </span>
-                            <span class="tabular-nums font-semibold">${formatTime(duration, false)}</span>
+                        <div onclick="window.showSessionDetails(${session.id})" class="flex items-start p-3 bg-gray-800/50 rounded-xl cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 ${subjectClass}">
+                            <i data-lucide="clock" class="w-5 h-5 mr-3 text-indigo-400 flex-shrink-0 mt-1"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold truncate text-white">${session.subject} - ${duration}</p>
+                                <p class="text-xs text-gray-400">Goal: ${session.goal || 'No Goal Set'}</p>
+                            </div>
                         </div>
                     `;
                 }).join('');
                 
-                summaryHtml += subjectRows || '<p class="text-sm text-gray-500">No time logged for any subject on this day.</p>';
-                summaryHtml += '</div></div>';
+                // 2. Filter and display COMPLETED TASKS (Bug 3 Fix)
+                const completedTasks = state.tasks
+                    .filter(t => t.completed && t.completedAt && getFormattedDate(t.completedAt) === dateKey);
 
-                // --- Completed Tasks (Green/Emerald Theme) ---
-                summaryHtml += `
-                    <div class="p-4 bg-emerald-900/40 rounded-xl border border-emerald-700/50">
-                        <h3 class="text-lg font-semibold text-emerald-300 flex items-center mb-3">
-                            <i data-lucide="list-check" class="w-5 h-5 mr-2"></i>
-                            Tasks Completed on ${formatDateForDisplay(dateKey)}
-                        </h3>
-                        <ul class="space-y-2">
+                const taskListHTML = completedTasks.map(task => `
+                    <div class="flex items-center p-3 text-sm bg-gray-700/50 rounded-xl border border-emerald-600/50">
+                        <i data-lucide="check-circle" class="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0"></i>
+                        <span class="text-gray-300 line-through">${task.text}</span>
+                    </div>
+                `).join('');
+
+
+                // 3. Construct the final HTML
+                D.dailySummaryContainer.innerHTML = `
+                    <div class="glass-base p-4 rounded-xl shadow-inner bg-gray-900/40">
+                        <h3 class="text-xl font-bold mb-2 text-indigo-300">Total Focus:</h3>
+                        <p class="text-5xl font-extrabold text-emerald-400 tabular-nums">${formatMinutes(totalDailyFocusSeconds)}</p>
+                        <p class="text-sm text-gray-500 mt-1">${formatDateForDisplay(dateKey)}</p>
+                    </div>
+
+                    <h3 class="text-xl font-semibold text-gray-300 mt-6 mb-3 border-b border-gray-700 pb-2 flex items-center">
+                        <i data-lucide="list-checks" class="w-5 h-5 mr-2"></i> Focus Sessions (${dailySessions.length})
+                    </h3>
+                    <div class="space-y-3">
+                        ${sessionListHTML || '<p class="text-gray-500 text-center py-2">No focus sessions logged on this day.</p>'}
+                    </div>
+
+                    <h3 class="text-xl font-semibold text-gray-300 mt-6 mb-3 border-b border-gray-700 pb-2 flex items-center">
+                        <i data-lucide="check-square" class="w-5 h-5 mr-2"></i> Completed Tasks (${completedTasks.length})
+                    </h3>
+                    <div class="space-y-3">
+                        ${taskListHTML || '<p class="text-gray-500 text-center py-2">No tasks completed on this day.</p>'}
+                    </div>
                 `;
                 
-                if (completedDailyTasks.length > 0) {
-                    const taskList = completedDailyTasks.map(task => `
-                        <li class="text-sm flex items-start text-emerald-100">
-                            <i data-lucide="check-circle" class="w-4 h-4 mr-2 mt-0.5 text-emerald-400 flex-shrink-0"></i>
-                            <span class="line-through">${task.text}</span>
-                        </li>
-                    `).join('');
-                    summaryHtml += taskList;
-                } else {
-                    summaryHtml += '<p class="text-sm text-emerald-200/70">No tasks were marked complete on this day.</p>';
-                }
-
-                summaryHtml += '</ul></div>'; // Close completed task container
-                
-                // --- Incomplete/Pending Tasks (Red Theme) ---
-                summaryHtml += `
-                    <div class="p-4 bg-red-900/40 rounded-xl border border-red-700/50">
-                        <h3 class="text-lg font-semibold text-red-300 flex items-center mb-3">
-                            <i data-lucide="x-circle" class="w-5 h-5 mr-2"></i>
-                            Currently Pending Tasks
-                        </h3>
-                        <ul class="space-y-2">
-                `;
-                
-                if (incompleteTasks.length > 0) {
-                    const taskList = incompleteTasks.map(task => `
-                        <li class="text-sm flex items-start text-red-100">
-                            <i data-lucide="minus-circle" class="w-4 h-4 mr-2 mt-0.5 text-red-400 flex-shrink-0"></i>
-                            <span>${task.text}</span>
-                        </li>
-                    `).join('');
-                    summaryHtml += taskList;
-                } else {
-                    summaryHtml += '<p class="text-sm text-red-200/70">Excellent! You have no pending tasks right now.</p>';
-                }
-
-                summaryHtml += '</ul></div>'; // Close pending container
-
-
-                D.dailySummaryContainer.innerHTML = summaryHtml;
                 window.createLucideIcons();
             }
 
             // --- TASK LOGIC ---
 
             function addTask() {
-                const taskText = D.taskInputNew.value.trim();
-                if (taskText) {
-                    state.tasks.push({
+                const text = D.taskInputNew.value.trim();
+                if (text) {
+                    const newTask = {
                         id: Date.now(),
-                        text: taskText,
+                        text: text,
                         completed: false,
-                        completedDate: null, // New field
-                    });
+                        createdAt: new Date().toISOString(),
+                        completedAt: null // Bug 3 Fix: Initialize timestamp for completion
+                    };
+                    state.tasks.push(newTask);
                     D.taskInputNew.value = '';
-                    renderTasks();
                     saveState();
-                    calculateAllStats(); // Recalculate stats
+                    renderTasks();
+                    calculateAllStats();
                 }
             }
-            
+
             function toggleTask(taskId) {
                 const task = state.tasks.find(t => t.id === taskId);
                 if (task) {
                     task.completed = !task.completed;
-                    // Capture completion date if completed
-                    task.completedDate = task.completed ? new Date().toISOString() : null;
-                    // Recalculate stats
-                    calculateAllStats(); 
-                    // Re-render tasks in the Tasks view
-                    renderTasks(); 
-                    // Re-render history view to update the summary if it's open
-                    if (state.currentPage === 'history') {
-                         renderHistoryView();
+                    
+                    // Bug 3 Fix: Add/Remove completion timestamp
+                    if (task.completed) {
+                        task.completedAt = new Date().toISOString();
+                    } else {
+                        task.completedAt = null;
                     }
+                    
                     saveState();
+                    renderTasks();
+                    calculateAllStats(); // To update task counts
                 }
             }
 
             function deleteTask(taskId) {
                 state.tasks = state.tasks.filter(t => t.id !== taskId);
-                calculateAllStats(); // Recalculate stats
-                renderTasks();
-                 // Re-render history view to update the summary if it's open
-                if (state.currentPage === 'history') {
-                    renderHistoryView();
-                }
                 saveState();
+                renderTasks();
+                calculateAllStats();
             }
 
             function renderTasks() {
-                D.tasksListContainer.innerHTML = state.tasks.map(task => `
-                    <div class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600/50 transition-all ${task.completed ? 'opacity-50' : ''}">
-                        <div class="flex items-center space-x-3 w-4/5">
+                if (state.currentPage !== 'tasks') return;
+
+                const pendingTasks = state.tasks.filter(t => !t.completed);
+                const completedTasks = state.tasks.filter(t => t.completed);
+
+                const generateTaskHtml = (task, isPending) => {
+                    const bgClass = isPending 
+                        ? 'bg-gray-800/50 border-gray-700/50 hover:bg-gray-700/50' 
+                        : 'bg-emerald-900/40 border-emerald-500/50 hover:bg-emerald-900/50';
+                    const textClass = isPending ? 'text-white' : 'text-gray-300 line-through';
+
+                    return `
+                        <div id="task-${task.id}" class="flex items-start p-3 rounded-xl transition-all ${bgClass} border">
                             <input 
                                 type="checkbox" 
-                                id="task-${task.id}" 
-                                class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-gray-900 cursor-pointer" 
-                                ${task.completed ? 'checked' : ''}
+                                id="check-${task.id}" 
+                                class="mt-1 flex-shrink-0" 
+                                ${task.completed ? 'checked' : ''} 
                                 onclick="window.toggleTask(${task.id})"
-                            />
-                            <label for="task-${task.id}" class="text-white text-base ${task.completed ? 'line-through text-gray-400' : ''} break-words cursor-pointer">
-                                ${task.text}
+                            >
+                            <label for="check-${task.id}" class="flex-1 ml-3 cursor-pointer">
+                                <span class="block text-sm font-medium ${textClass}">${task.text}</span>
+                                <span class="text-xs text-gray-500">${new Date(task.createdAt).toLocaleDateString()}</span>
                             </label>
+                            <button onclick="window.deleteTask(${task.id})" class="p-1 rounded-full text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 ml-4">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
                         </div>
-                        <button onclick="window.deleteTask(${task.id})" class="text-red-400 hover:text-red-500 transition-colors flex-shrink-0 p-1">
-                            <i data-lucide="trash-2" class="w-5 h-5"></i>
-                        </button>
-                    </div>
-                `).join('') || `<p class="text-center text-gray-500 text-sm py-4">No tasks yet! Add one above.</p>`;
-                window.createLucideIcons();
-            }
+                    `;
+                };
 
-            // --- ACHIEVEMENT RENDERING (MODIFIED) ---
-            
-            function renderAchievements() {
-                const { 
-                    overallTime, monthlyTime, weeklyTime, efficiency, tasksCompleted, totalTasks, 
-                    achievements, avgDailyHours, prevMonthlyTime, prevWeeklyTime, dailyTimeInWeek
-                } = calculateAllStats();
-                
-                // --- Progress Section HTML ---
-                let progressHtml = `
-                    <h2 class="text-xl font-bold text-gray-300 mb-4 flex items-center">
-                        <i data-lucide="activity-square" class="w-5 h-5 mr-2 text-emerald-400"></i>
-                        Focus & Efficiency Metrics
-                    </h2>
-                    <div class="space-y-6 mb-8">
-                        ${renderOverallProgress(overallTime, state.streakCount, avgDailyHours, efficiency, tasksCompleted, totalTasks)}
-                        ${renderMonthlyProgress(monthlyTime, prevMonthlyTime)}
-                        ${renderWeeklyProgress(dailyTimeInWeek)}
-                    </div>
+                const pendingHTML = pendingTasks.map(t => generateTaskHtml(t, true)).join('');
+                const completedHTML = completedTasks.map(t => generateTaskHtml(t, false)).join('');
 
-                    <h2 class="text-xl font-bold text-gray-300 mb-4 flex items-center border-t border-gray-700 pt-4">
-                        <i data-lucide="trophy" class="w-5 h-5 mr-2 text-yellow-400"></i>
-                        Trophy Collection
-                    </h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        ${ACHIEVEMENTS_CONFIG.map(ach => renderAchievementCard(ach, achievements[ach.id])).join('')}
+                D.tasksListContainer.innerHTML = `
+                    <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2 flex items-center">
+                        <i data-lucide="list-todo" class="w-5 h-5 mr-2 text-indigo-400"></i> To Do (${pendingTasks.length})
+                    </h3>
+                    <div class="space-y-3 mb-8">
+                        ${pendingHTML || '<p class="text-gray-500 text-center py-4">All tasks complete! Add a new goal.</p>'}
                     </div>
-                `;
-                
-                D.achievementsContainer.innerHTML = progressHtml;
-                window.createLucideIcons();
-            }
-            
-            // NEW: Overall Progress Card
-            function renderOverallProgress(overallTime, streakCount, avgDailyHours, efficiency, tasksCompleted, totalTasks) {
-                return `
-                    <div class="p-4 bg-indigo-900/40 rounded-xl border border-indigo-700/50">
-                        <h3 class="text-lg font-semibold text-indigo-300 flex items-center mb-3">
-                            <i data-lucide="layers-3" class="w-5 h-5 mr-2"></i>
-                            Overall Focus (All Time)
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4 text-center">
-                            ${renderMetric('Total Time', formatMinutes(overallTime), 'clock', 'indigo')}
-                            ${renderMetric('Highest Streak', `${streakCount} x 10h`, 'medal', 'amber')}
-                            ${renderMetric('Avg Daily Hours', `${avgDailyHours.toFixed(2)} hrs`, 'trending-up', 'sky')}
-                            ${renderMetric('Efficiency Rate', `${efficiency}%`, 'target', efficiency >= 80 ? 'emerald' : efficiency >= 50 ? 'amber' : 'red')}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // NEW: Monthly Progress Card
-            function renderMonthlyProgress(monthlyTime, prevMonthlyTime) {
-                const percentageChange = prevMonthlyTime > 0 
-                    ? ((monthlyTime - prevMonthlyTime) / prevMonthlyTime) * 100 
-                    : (monthlyTime > 0 ? 100 : 0);
-                
-                const isIncrease = percentageChange >= 0;
-                const trendIcon = isIncrease ? 'arrow-up-circle' : 'arrow-down-circle';
-                const trendColor = isIncrease ? 'text-emerald-400' : 'text-red-400';
-                
-                return `
-                    <div class="p-4 bg-gray-700/50 rounded-xl border border-gray-600/50">
-                        <h3 class="text-lg font-semibold text-gray-300 flex items-center mb-3">
-                            <i data-lucide="calendar" class="w-5 h-5 mr-2"></i>
-                            Monthly Progress
-                        </h3>
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <span class="text-4xl font-extrabold tabular-nums text-sky-400">${formatMinutes(monthlyTime)}</span>
-                                <p class="text-sm text-gray-400 mt-1">Focus this month</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="flex items-center justify-end ${trendColor} text-lg font-bold">
-                                    <i data-lucide="${trendIcon}" class="w-5 h-5 mr-1"></i>
-                                    <span>${Math.abs(percentageChange).toFixed(1)}%</span>
-                                </div>
-                                <p class="text-xs text-gray-500">vs. previous month (${formatMinutes(prevMonthlyTime)})</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // NEW: Weekly Progress Card with Bar Graph
-            function renderWeeklyProgress(dailyTimeInWeek) {
-                // Find the max time for scaling the bars, minimum 1 hour for visibility
-                const maxTime = Math.max(...dailyTimeInWeek, 3600); 
-                const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                
-                const barsHtml = dailyTimeInWeek.map((time, index) => {
-                    const heightPercent = (time / maxTime) * 100;
-                    // Use a slightly different color for the bar
-                    const barColor = heightPercent > 0 ? 'bg-emerald-500' : 'bg-gray-700/50';
-                    const tooltipTime = formatMinutes(time);
                     
-                    // The 'daily-bar' class is for potential future JS click handlers
+                    <h3 class="text-xl font-semibold text-white mb-3 border-b border-gray-700 pb-2 flex items-center">
+                        <i data-lucide="check-circle" class="w-5 h-5 mr-2 text-emerald-400"></i> Completed (${completedTasks.length})
+                    </h3>
+                    <div class="space-y-3">
+                        ${completedHTML || '<p class="text-gray-500 text-center py-4">No tasks completed yet.</p>'}
+                    </div>
+                `;
+
+                window.createLucideIcons();
+            }
+
+            // --- ACHIEVEMENTS RENDERING (Trophies) ---
+
+            function renderAchievements() {
+                if (state.currentPage !== 'achievements') return;
+                calculateAllStats(); // Ensure stats are fresh
+
+                D.trophiesContainer.innerHTML = ACHIEVEMENTS_CONFIG.map(ach => {
+                    const status = stats.achievements[ach.id];
+                    if (!status) return '';
+                    
+                    const isComplete = status.isComplete;
+                    const percentage = status.percentage;
+
+                    const iconClass = isComplete ? `${ach.color}` : 'text-gray-500';
+                    const progressBg = isComplete ? 'bg-emerald-600' : 'bg-indigo-600';
+                    const progressText = isComplete ? 'Completed!' : `${status.progress}/${status.goal}`;
+
                     return `
-                        <div 
-                            class="flex flex-col items-center cursor-pointer daily-bar group relative w-1/7 min-w-[12%]" 
-                            onclick="window.showDailyProgressDetail(event, ${index}, ${time})"
-                        >
-                            <div class="absolute -top-6 hidden group-hover:block px-2 py-1 bg-gray-700 rounded-lg text-xs text-white whitespace-nowrap z-10">
-                                ${tooltipTime}
+                        <div class="glass-base p-5 rounded-xl shadow-lg bg-gray-800/50 border-gray-700/50 flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center mb-3">
+                                    <i data-lucide="${ach.icon}" class="w-8 h-8 mr-3 ${iconClass} flex-shrink-0"></i>
+                                    <h4 class="text-lg font-bold ${isComplete ? 'text-white' : 'text-gray-300'}">${ach.name}</h4>
+                                </div>
+                                <p class="text-gray-400 text-sm mb-4">${ach.description}</p>
                             </div>
-                            <div 
-                                class="w-full rounded-t-lg transition-all duration-300 ${barColor}" 
-                                style="height: ${heightPercent > 0 ? Math.max(5, heightPercent) : 5}%"
-                            ></div>
-                            <span class="text-xs text-gray-400 mt-1">${weekDays[index]}</span>
+                            
+                            <div class="mt-4">
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="${isComplete ? 'text-emerald-400' : 'text-indigo-300'}">${progressText}</span>
+                                    <span class="text-gray-400">${Math.floor(percentage)}%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                    <div class="${progressBg} h-2.5 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');
-                
-                return `
-                    <div class="p-4 bg-gray-700/50 rounded-xl border border-gray-600/50">
-                        <h3 class="text-lg font-semibold text-gray-300 flex items-center mb-3">
-                            <i data-lucide="bar-chart-2" class="w-5 h-5 mr-2"></i>
-                            Weekly Focus - Daily Breakdown
-                        </h3>
-                        <div class="flex items-end h-32 space-x-2 p-2 bg-gray-800/50 rounded-lg border border-gray-700 justify-between">
-                            ${barsHtml}
+
+                window.createLucideIcons();
+            }
+            
+            // --- PROGRESS RENDERING (Metrics) ---
+            function renderProgress() {
+                if (state.currentPage !== 'progress') return;
+                calculateAllStats();
+
+                // 1. Progress Metrics (Overall, Monthly, Weekly, Tasks)
+                const progressMetrics = [
+                    { 
+                        name: 'Overall Focus Time', 
+                        icon: 'zap', 
+                        value: formatMinutes(stats.overallTime), 
+                        color: 'text-indigo-400',
+                        subtext: 'Across all sessions'
+                    },
+                    { 
+                        name: 'Monthly Focus Time', 
+                        icon: 'calendar-range', 
+                        value: formatMinutes(stats.monthlyTime), 
+                        color: 'text-sky-400',
+                        subtext: formatComparison(stats.monthlyTime, stats.prevMonthlyTime, 'month')
+                    },
+                    { 
+                        name: 'Weekly Focus Time', 
+                        icon: 'calendar-check', 
+                        value: formatMinutes(stats.weeklyTime), 
+                        color: 'text-emerald-400',
+                        subtext: formatComparison(stats.weeklyTime, stats.prevWeeklyTime, 'week')
+                    },
+                    { 
+                        name: 'Tasks Completed', 
+                        icon: 'list-checks', 
+                        value: stats.tasksCompleted.toString(), 
+                        color: 'text-amber-400',
+                        subtext: `Total: ${stats.totalTasks}`
+                    },
+                    { 
+                        name: 'Productivity Score', 
+                        icon: 'trending-up', 
+                        value: `${stats.efficiency}%`, 
+                        color: stats.efficiency >= 75 ? 'text-emerald-400' : 'text-yellow-400',
+                        subtext: `Completion Rate`
+                    },
+                    {
+                        name: 'Avg Daily Focus',
+                        icon: 'sun',
+                        value: formatMinutes(stats.avgDailyHours * 3600), 
+                        color: 'text-red-400',
+                        subtext: 'Since first session'
+                    }
+                ];
+
+                const metricsHTML = progressMetrics.map(metric => `
+                    <div class="glass-base p-5 rounded-xl shadow-lg bg-gray-800/50 border-gray-700/50">
+                        <div class="flex items-center justify-between">
+                            <i data-lucide="${metric.icon}" class="w-8 h-8 ${metric.color}"></i>
+                            <span class="text-3xl font-extrabold text-white tabular-nums">${metric.value}</span>
                         </div>
-                        <p id="daily-detail" class="text-sm text-center text-gray-400 mt-3">Click a bar for details.</p>
+                        <p class="text-gray-400 text-sm mt-3 flex justify-between items-center">
+                            ${metric.name}
+                            ${metric.subtext}
+                        </p>
+                    </div>
+                `).join('');
+                
+                D.metricsContainer.innerHTML = metricsHTML;
+                
+                // 2. Weekly Breakdown Chart (Simple Bar Chart)
+                const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const maxTime = Math.max(...stats.dailyTimeInWeek, 1); // Avoid division by zero
+                
+                const breakdownHTML = `
+                    <div class="flex items-end h-32 space-x-2">
+                        ${stats.dailyTimeInWeek.map((time, index) => {
+                            const heightPercent = Math.max(5, (time / maxTime) * 100);
+                            const duration = formatMinutes(time);
+                            const barColor = time > 0 ? 'bg-indigo-500' : 'bg-gray-700';
+                            
+                            return `
+                                <div class="flex flex-col items-center flex-1 h-full relative group">
+                                    <div class="w-full ${barColor} rounded-t transition-all duration-300" style="height: ${heightPercent}%;"></div>
+                                    <div class="text-xs text-gray-400 mt-1">${dayLabels[index]}</div>
+                                    <div class="absolute bottom-full mb-1 p-1 bg-gray-700 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">${duration}</div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 `;
-            }
-            
-            // Helper for simple metric display within a grid
-            function renderMetric(title, value, icon, color) {
-                const colorClass = `text-${color}-400`;
-                return `
-                    <div class="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                        <div class="flex items-center justify-center ${colorClass} mb-1">
-                            <i data-lucide="${icon}" class="w-5 h-5 mr-1"></i>
-                            <span class="text-xl font-bold tabular-nums">${value}</span>
-                        </div>
-                        <p class="text-xs text-gray-400">${title}</p>
-                    </div>
-                `;
+
+                D.weeklyBreakdownContainer.innerHTML = breakdownHTML;
+
+                window.createLucideIcons();
             }
 
-            function renderAchievementCard(achConfig, achStatus) {
-                const { progress, currentTier, nextTierGoal, nextTierName, isComplete, percentage } = achStatus;
-                const currentTierConfig = achConfig.tiers[currentTier];
-                
-                let tierColor = 'text-gray-500';
-                let progressDescription = '';
-                let iconClass = 'bg-gray-700';
-                let progressWidth = percentage;
+            // --- MODAL & FULLSCREEN LOGIC ---
 
-                if (currentTier === 'none') {
-                    progressDescription = `${progress} / ${nextTierGoal} ${achConfig.unit}`;
-                    iconClass = 'bg-gray-700';
-                    tierColor = 'text-gray-500';
-                } else if (currentTier === 'easy' || currentTier === 'medium') {
-                    // Use the color of the current tier and show progress towards the next
-                    tierColor = currentTierConfig.color;
-                    iconClass = currentTierConfig.color.replace('text-', 'bg-');
-                    progressDescription = `${progress} / ${nextTierGoal} ${achConfig.unit}`;
-                } else if (currentTier === 'hard') {
-                    // Max tier reached
-                    tierColor = achConfig.tiers.hard.color; 
-                    iconClass = achConfig.tiers.hard.color.replace('text-', 'bg-');
-                    progressDescription = `${progress} / ${achConfig.tiers.hard.goal} ${achConfig.unit}`;
-                    progressWidth = 100;
-                }
-                
-                const tierDisplay = currentTier === 'none' 
-                    ? 'Unranked' 
-                    : (isComplete ? achConfig.tiers.hard.name : currentTierConfig.name);
-
-                return `
-                    <div class="glass-base p-4 rounded-xl shadow-lg bg-gray-800/40 border-gray-700/50 space-y-3">
-                        <div class="flex items-center space-x-3">
-                            <div class="p-3 rounded-full ${iconClass} text-white shadow-md flex-shrink-0">
-                                <i data-lucide="${achConfig.icon}" class="w-6 h-6"></i>
-                            </div>
-                            <div>
-                                <p class="font-semibold text-base text-gray-200">${achConfig.name}</p>
-                                <p class="text-sm font-bold ${tierColor}">${tierDisplay}</p>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-1">
-                            <p class="text-xs text-gray-400">${isComplete ? 'MAX TIER REACHED!' : `Next Tier: ${nextTierName}`}</p>
-                            <div class="w-full bg-gray-700 rounded-full h-2">
-                                <div class="bg-indigo-500 h-2 rounded-full transition-all duration-700" style="width: ${progressWidth}%"></div>
-                            </div>
-                            <p class="text-xs text-gray-500 tabular-nums">${progressDescription}</p>
-                        </div>
-                    </div>
-                `;
-            }
-
-
-            // --- BROWN NOISE GENERATOR (Psychological Focus Feature) ---
-            
-            function initAudioContext() {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-            }
-            
-            /** Generates and plays Brown Noise (Psychological Focus Feature) */
-            window.toggleBrownNoise = () => {
-                initAudioContext();
-                
-                if (isNoisePlaying) {
-                    if (brownNoiseGenerator) {
-                        brownNoiseGenerator.stop();
-                        brownNoiseGenerator.disconnect();
-                        brownNoiseGenerator = null;
-                    }
-                    isNoisePlaying = false;
-                } else {
-                    if (audioContext.state === 'suspended') {
-                        audioContext.resume();
-                    }
-
-                    // Create White Noise Buffer
-                    const bufferSize = 4096;
-                    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-                    const output = noiseBuffer.getChannelData(0);
-                    for (let i = 0; i < bufferSize; i++) {
-                        output[i] = Math.random() * 2 - 1;
-                    }
-
-                    const whiteNoise = audioContext.createBufferSource();
-                    whiteNoise.buffer = noiseBuffer;
-                    whiteNoise.loop = true;
-                    
-                    // Use a low-pass filter to shape White Noise into Brown Noise
-                    const lowPassFilter = audioContext.createBiquadFilter();
-                    lowPassFilter.type = 'lowpass';
-                    lowPassFilter.frequency.setValueAtTime(400, audioContext.currentTime); 
-                    lowPassFilter.Q.setValueAtTime(0.5, audioContext.currentTime);
-                    
-                    const gainNode = audioContext.createGain();
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // Low volume
-
-                    whiteNoise.connect(lowPassFilter);
-                    lowPassFilter.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-
-                    whiteNoise.start();
-                    brownNoiseGenerator = whiteNoise;
-                    isNoisePlaying = true;
-                }
-                
-                renderUI();
-            };
-
-            // --- FULLSCREEN CLOCK LOGIC ---
-            
-            /** Toggles the fullscreen clock modal. */
             window.toggleFullscreenClock = () => {
-                if (D.fullscreenClockModal.classList.contains('hidden')) {
-                    const isTimerEmpty = !state.isPomodoroActive && state.timeElapsed === 0;
-                    if (isTimerEmpty) {
-                         // Using the simple message box as requested
-                         const modal = document.getElementById('details-modal');
-                         document.getElementById('modal-content').textContent = "Start the timer or resume a session to enter Fullscreen Focus Mode.";
-                         modal.classList.remove('hidden');
-                         return;
-                    }
+                if (D.fullscreenBtn.disabled) return;
+
+                const isHidden = D.fullscreenClockModal.classList.contains('hidden');
+                
+                if (isHidden) {
                     D.fullscreenClockModal.classList.remove('hidden');
-                    // Rerender to populate the subject/goal and update time immediately
-                    renderUI(); 
+                    // Request fullscreen API access for the modal element
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen();
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        document.documentElement.webkitRequestFullscreen();
+                    } else if (document.documentElement.msRequestFullscreen) {
+                        document.documentElement.msRequestFullscreen();
+                    }
                 } else {
                     D.fullscreenClockModal.classList.add('hidden');
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
                 }
+                renderUI(); // Re-render to update the time display inside the modal
             };
-            
-            // NEW: Weekly Daily Detail Display
-            window.showDailyProgressDetail = (event, dayIndex, time) => {
-                const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                const detailElement = document.getElementById('daily-detail');
-                
-                // Get the start of the current week (Monday)
-                const startOfWeek = getPeriodStart('week');
-                const selectedDayDate = new Date(startOfWeek.getTime());
-                selectedDayDate.setDate(selectedDayDate.getDate() + dayIndex);
-                
-                const dateKey = getFormattedDate(selectedDayDate.toISOString());
-                
-                // Find all sessions for the selected day
-                const dailySessions = state.sessions.filter(s => getFormattedDate(s.timestamp) === dateKey);
-                
-                // Aggregate time per subject for the specific day
-                const subjectTimes = dailySessions.reduce((acc, session) => {
-                    acc[session.subject] = (acc[session.subject] || 0) + session.durationSeconds;
-                    return acc;
-                }, {});
-                
-                let details = `<span class="font-bold">${weekDays[dayIndex]} (${formatDateForDisplay(dateKey)})</span> - Total: <span class="text-emerald-400 font-bold">${formatMinutes(time)}</span>`;
 
-                if (time > 0) {
-                    details += ' | ';
-                    details += Object.entries(subjectTimes)
-                        .map(([subject, duration]) => `${subject}: ${formatMinutes(duration)}`)
-                        .join(', ');
-                }
-
-                detailElement.innerHTML = details;
-            }
-
-
-            // --- EXPOSE GLOBAL HANDLERS FOR HTML ACCESS ---
-            window.startPauseHandler = () => {
-                if (state.isRunning) {
-                    stopTimer();
-                } else {
-                    startTimer();
-                }
-            };
-            
-            window.resetTimer = resetTimer;
-            window.viewDetails = (sessionId) => {
+            window.showSessionDetails = (sessionId) => {
                 const session = state.sessions.find(s => s.id === sessionId);
                 if (session) {
-                    const duration = formatTime(session.durationSeconds, true);
-                    // Format timestamp for display
+                    const duration = formatMinutes(session.durationSeconds);
                     const date = new Date(session.timestamp).toLocaleString();
                     
                     const content = `
@@ -1759,12 +1669,22 @@ Goal: ${session.goal}
                     D.detailsModal.classList.remove('hidden');
                 }
             };
+            
+            // --- EXPOSE GLOBAL FUNCTIONS ---
             window.switchPage = switchPage;
             window.addTask = addTask;
             window.toggleTask = toggleTask;
             window.deleteTask = deleteTask;
             window.handleDateChange = renderDailySummary; 
-
+            window.startPauseHandler = () => {
+                if (state.isRunning) {
+                    stopTimer();
+                } else {
+                    startTimer();
+                }
+            };
+            window.resetTimer = resetTimer;
+            
             // --- INITIALIZATION ---
             
             window.onload = () => {
