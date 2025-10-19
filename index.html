@@ -28,7 +28,12 @@
         .glass-base {
             backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: background-color 0.5s, border-color 0.5s;
+            transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); /* Base shadow */
+        }
+        
+        .glass-base:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.1); /* Lifted shadow on hover */
         }
 
         /* Styling for the subject radio buttons */
@@ -36,7 +41,7 @@
             background-color: #4f46e5; /* indigo-600 */
             border-color: #a5b4fc; /* indigo-300 */
             color: #fff;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.5); /* Blue glow */
         }
         
         /* Custom checkbox style */
@@ -78,35 +83,39 @@
                 font-size: 6rem;
             }
         }
+
     </style>
   
 </head>
 <body class="text-white min-h-screen">
-    <div class="max-w-4xl mx-auto p-4 lg:p-8">
-        <header class="text-center mb-8">
+    <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-6 sm:mb-8">
             <h1 class="text-3xl font-extrabold text-indigo-400">Study Tracker</h1>
         </header>
 
        
             
-            <nav class="flex space-x-2 mb-6 p-1 bg-gray-800 rounded-xl">
-                <button id="nav-timer-btn" onclick="switchPage('timer')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-indigo-600">
+            <nav class="flex space-x-2 mb-6 p-1 bg-gray-800 rounded-full overflow-x-auto">
+                <button id="nav-timer-btn" onclick="switchPage('timer')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-indigo-600">
                     <i data-lucide="clock" class="w-4 h-4 inline mr-1"></i> Timer
                 </button>
-                <button id="nav-tasks-btn" onclick="switchPage('tasks')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
+                <button id="nav-tasks-btn" onclick="switchPage('tasks')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-gray-700/50 hover:bg-gray-700">
                     <i data-lucide="list-todo" class="w-4 h-4 inline mr-1"></i> Tasks
                 </button>
-                <button id="nav-history-btn" onclick="switchPage('history')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
+                <button id="nav-history-btn" onclick="switchPage('history')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-gray-700/50 hover:bg-gray-700">
                     <i data-lucide="calendar" class="w-4 h-4 inline mr-1"></i> History
                 </button>
-                <button id="nav-achievements-btn" onclick="switchPage('achievements')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
+                <button id="nav-achievements-btn" onclick="switchPage('achievements')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-gray-700/50 hover:bg-gray-700">
                     <i data-lucide="medal" class="w-4 h-4 inline mr-1"></i> Achievements
                 </button>
-                <button id="nav-progress-btn" onclick="switchPage('progress')" class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-colors bg-gray-700/50 hover:bg-gray-700">
+                <button id="nav-progress-btn" onclick="switchPage('progress')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-gray-700/50 hover:bg-gray-700">
                     <i data-lucide="trending-up" class="w-4 h-4 inline mr-1"></i> Progress
                 </button>
+                <button id="nav-settings-btn" onclick="switchPage('settings')" class="flex-1 py-2 px-3 sm:px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap bg-gray-700/50 hover:bg-gray-700">
+                    <i data-lucide="settings" class="w-4 h-4 inline mr-1"></i> Settings
+                </button>
             </nav>
- <main class="glass-base rounded-2xl p-6 lg:p-8 shadow-2xl bg-gray-900/40">
+ <main class="glass-base rounded-3xl p-5 sm:p-6 lg:p-8 shadow-2xl bg-gray-900/40">
                   <div id="timer-view">
             
             <div id="timer-card" class="glass-base p-6 rounded-3xl shadow-2xl mb-8 bg-gray-800/30 border-gray-500/50">
@@ -132,9 +141,9 @@
                 </div>
                 
                 
-                <div class="mb-8 flex justify-center items-center space-x-6 py-2">
+                <div class="mb-8 flex flex-col sm:flex-row justify-center items-center sm:space-x-6 space-y-4 sm:space-y-0 py-2">
                     
-                    <div class="relative w-20 h-20 flex-shrink-0">
+                    <div class="relative w-24 h-24 flex-shrink-0">
                         <svg class="w-full h-full transform -rotate-90" viewBox="0 0 70 70">
                             
                             <circle 
@@ -164,9 +173,9 @@
                     </div>
 
                     
-                    <div class="flex-grow">
-                        <div class="text-xs text-gray-400 mb-1">Total Focus Streaks (10h each)</div>
-                        <div class="flex items-center">
+                    <div class="flex-grow text-center sm:text-left">
+                        <div class="text-sm text-gray-400 mb-1">Total Focus Streaks (10h each)</div>
+                        <div class="flex items-center justify-center sm:justify-start">
                             <i data-lucide="medal" class="w-8 h-8 mr-3 text-amber-400"></i>
                             <span id="streak-count" class="text-5xl font-extrabold text-amber-300 tabular-nums">0</span>
                         </div>
@@ -181,7 +190,7 @@
                     <label class="block text-sm font-medium mb-2 text-gray-300">
                         Select Subject
                     </label>
-                    <div id="subject-selector" class="flex justify-between space-x-2">
+                    <div id="subject-selector" class="flex flex-wrap gap-2 sm:flex-row sm:space-x-2 sm:gap-0">
                         
                     </div>
                 </div>
@@ -191,7 +200,7 @@
                     <label for="task-input" class="block text-sm font-medium mb-2 text-gray-300">
                         Session Goal
                     </label>
-                    <div class="flex items-center bg-white/10 rounded-xl p-3">
+                    <div class="flex items-center bg-white/10 rounded-full p-3">
                         <i data-lucide="target" class="w-5 h-5 mr-3 text-indigo-400 flex-shrink-0"></i>
                         <input 
                             id="task-input"
@@ -213,12 +222,12 @@
                     </button>
                     
                     
-                    <button id="pomodoro-btn" onclick="window.togglePomodoro()" class="p-4 rounded-full bg-gray-700/50 hover:bg-gray-600/70 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
+                    <button id="pomodoro-btn" onclick="togglePomodoro()" class="p-4 rounded-full bg-gray-700/50 hover:bg-gray-600/70 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
                         <i data-lucide="timer" class="w-6 h-6"></i>
                     </button>
 
                     
-                    <button id="fullscreen-btn" onclick="window.toggleFullscreenClock()" class="p-4 rounded-full bg-indigo-600/70 hover:bg-indigo-600 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
+                    <button id="fullscreen-btn" onclick="toggleFullscreenClock()" class="p-4 rounded-full bg-indigo-600/70 hover:bg-indigo-600 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
                         <i data-lucide="maximize" class="w-6 h-6"></i>
                     </button>
                 </div>
@@ -244,7 +253,7 @@
                 
                 
                 <div class="mb-6 flex space-x-3">
-                    <div class="flex items-center bg-white/10 rounded-xl p-3 flex-grow">
+                    <div class="flex items-center bg-white/10 rounded-full p-3 flex-grow">
                         <i data-lucide="plus-circle" class="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0"></i>
                         <input 
                             id="new-task-input"
@@ -254,7 +263,7 @@
                             onkeypress="if(event.key === 'Enter') addTask()"
                         >
                     </div>
-                    <button onclick="addTask()" class="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 transition-colors flex-shrink-0">
+                    <button onclick="addTask()" class="p-3 rounded-full bg-emerald-600 hover:bg-emerald-700 transition-colors flex-shrink-0">
                         <i data-lucide="send" class="w-6 h-6"></i>
                     </button>
                 </div>
@@ -275,8 +284,8 @@
                     <label for="date-selector" class="block text-sm font-medium mb-2 text-gray-300">Select Day</label>
                     <select 
                         id="date-selector" 
-                        onchange="window.handleDateChange(this.value)" 
-                        class="w-full p-3 rounded-xl bg-gray-700 border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500"
+                        onchange="handleDateChange(this.value)" 
+                        class="w-full p-3 rounded-full bg-gray-700 border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500"
                     >
                         <option value="">No sessions logged</option>
                     </select>
@@ -302,15 +311,50 @@
             <div class="glass-base p-6 rounded-3xl shadow-2xl mb-8 bg-gray-800/30 border-gray-500/50">
                 <h1 class="text-2xl font-bold text-indigo-300 mb-6">Cumulative Progress</h1>
                 <p class="text-gray-400 mb-6">Track your long-term statistics and compare performance week-over-week.</p>
-                <div id="metrics-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div id="metrics-container" class="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                     
                 </div>
                 
                 <h2 class="text-xl font-semibold text-gray-300 mt-8 mb-4 border-b border-gray-700 pb-2 flex items-center">
-                    <i data-lucide="bar-chart-2" class="w-5 h-5 mr-2"></i> Weekly Focus Breakdown
+                    <i data-lucide="bar-chart-2" class="w-5 h-5 mr-2"></i> Weekly Focus Breakdown (Area Chart)
                 </h2>
                 <div id="weekly-breakdown-container" class="p-4 bg-gray-900/40 rounded-xl">
                     <p class="text-center text-gray-400">Loading weekly data...</p>
+                </div>
+            </div>
+        </div>
+
+        
+        <div id="settings-view" class="hidden">
+            <div class="glass-base p-6 rounded-3xl shadow-2xl mb-8 bg-gray-800/30 border-gray-500/50">
+                <h1 class="text-2xl font-bold text-yellow-300 mb-6">Application Settings</h1>
+                
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-300 mb-4 border-b border-gray-700 pb-2 flex items-center">
+                        <i data-lucide="book-open-check" class="w-5 h-5 mr-2"></i> Subject Management
+                    </h2>
+                    
+                    
+                    <div class="mb-6 flex space-x-3">
+                        <div class="flex items-center bg-white/10 rounded-full p-3 flex-grow">
+                            <i data-lucide="book-open" class="w-5 h-5 mr-3 text-yellow-400 flex-shrink-0"></i>
+                            <input 
+                                id="new-subject-input"
+                                type="text"
+                                placeholder="Enter new subject name (e.g., History)"
+                                class="w-full bg-transparent text-white placeholder-gray-400 focus:outline-none"
+                                onkeypress="if(event.key === 'Enter') addSubjectHandler()"
+                            >
+                        </div>
+                        <button onclick="addSubjectHandler()" class="p-3 rounded-full bg-yellow-600 hover:bg-yellow-700 transition-colors flex-shrink-0">
+                            <i data-lucide="plus" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+
+                    
+                    <div id="subjects-list-manager" class="space-y-3 max-h-96 overflow-y-auto pt-2">
+                        
+                    </div>
                 </div>
             </div>
         </div>
@@ -328,7 +372,7 @@
             <p id="modal-content" class="text-gray-300 whitespace-pre-wrap"></p>
             <button 
                 onclick="document.getElementById('details-modal').classList.add('hidden')"
-                class="w-full mt-4 flex items-center justify-center p-3 rounded-xl font-semibold text-lg transition-colors bg-indigo-600 hover:bg-indigo-700"
+                class="w-full mt-4 flex items-center justify-center p-3 rounded-full font-semibold text-lg transition-colors bg-indigo-600 hover:bg-indigo-700"
             >
                 Close
             </button>
@@ -339,7 +383,7 @@
     <div id="fullscreen-clock-modal" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-4">
         
         <button 
-            onclick="window.toggleFullscreenClock()" 
+            onclick="toggleFullscreenClock()" 
             class="absolute top-6 right-6 p-3 rounded-full text-white bg-white/10 hover:bg-white/20 transition-colors z-50"
         >
             <i data-lucide="minimize" class="w-8 h-8"></i>
@@ -356,11 +400,8 @@
     
 
 
-
     <script>
-        // Use an IIFE (Immediately Invoked Function Expression) to create a private scope
-        (function() {
-            // --- GLOBAL STATE & CONSTANTS (Scoped to IIFE) ---
+            // --- GLOBAL STATE & CONSTANTS ---
             const LOCAL_STORAGE_KEY = 'subjectTrackerData';
             const STREAK_GOAL_SECONDS = 10 * 3600; // 10 hours
             const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 30; // Radius 30 from SVG
@@ -369,11 +410,15 @@
             const POMODORO_FOCUS_SECONDS = 55 * 60; // 55 minutes
             const POMODORO_BREAK_SECONDS = 5 * 60;  // 5 minutes
             
-            const SUBJECTS = [
+            // Subject colors and default list
+            const SUBJECT_COLORS = ['indigo', 'emerald', 'sky', 'yellow', 'red', 'purple', 'teal', 'pink'];
+            
+            const DEFAULT_SUBJECTS = [
                 { id: 'physics', name: 'Physics', color: 'indigo' },
                 { id: 'chemistry', name: 'Chemistry', color: 'emerald' },
                 { id: 'math', name: 'Math', color: 'sky' },
                 { id: 'other', name: 'Other', color: 'yellow' },
+                { id: 'lang', name: 'Language', color: 'red' }, 
             ];
             
      // --- NEW ACHIEVEMENT/PROGRESS CONFIG (Flattened Structure) ---
@@ -441,7 +486,8 @@
                 isRunning: false,
                 timeElapsed: 0,
                 startTime: null,
-                currentSubject: SUBJECTS[0].id,
+                subjects: DEFAULT_SUBJECTS, // DYNAMIC SUBJECTS
+                currentSubject: DEFAULT_SUBJECTS[0].id,
                 sessionGoal: '',
                 sessions: [],
                 tasks: [], 
@@ -471,11 +517,12 @@
                 totalTasks: 0,
                 efficiency: 0,
                 avgDailyHours: 0,
+                avgSessionLengthSeconds: 0,
                 achievements: {},
             };
 
 
-            // --- DOM ELEMENTS (Scoped to IIFE) ---
+            // --- DOM ELEMENTS (Scoped by convention) ---
             const D = {
                 // Timer View elements
                 timerTitle: document.getElementById('timer-title'),
@@ -502,12 +549,14 @@
                 tasksView: document.getElementById('tasks-view'),
                 historyView: document.getElementById('history-view'), 
                 achievementsView: document.getElementById('achievements-view'), 
-                progressView: document.getElementById('progress-view'), // NEW
+                progressView: document.getElementById('progress-view'), 
+                settingsView: document.getElementById('settings-view'), // NEW SETTINGS VIEW
                 navTimerBtn: document.getElementById('nav-timer-btn'),
                 navTasksBtn: document.getElementById('nav-tasks-btn'),
                 navHistoryBtn: document.getElementById('nav-history-btn'),
                 navAchievementsBtn: document.getElementById('nav-achievements-btn'), 
-                navProgressBtn: document.getElementById('nav-progress-btn'), // NEW
+                navProgressBtn: document.getElementById('nav-progress-btn'), 
+                navSettingsBtn: document.getElementById('nav-settings-btn'), // NEW SETTINGS BUTTON
                 
                 // Tasks UI elements
                 taskInputNew: document.getElementById('new-task-input'),
@@ -517,22 +566,26 @@
                 dateSelector: document.getElementById('date-selector'),
                 dailySummaryContainer: document.getElementById('daily-summary-container'),
                 
-                // Achievements UI elements (updated names)
+                // Achievements UI elements 
                 trophiesContainer: document.getElementById('trophies-container'),
-                metricsContainer: document.getElementById('metrics-container'), // NEW
-                weeklyBreakdownContainer: document.getElementById('weekly-breakdown-container'), // NEW
+                metricsContainer: document.getElementById('metrics-container'), 
+                weeklyBreakdownContainer: document.getElementById('weekly-breakdown-container'), 
                 
                 // Fullscreen Clock elements
                 fullscreenClockModal: document.getElementById('fullscreen-clock-modal'),
                 fullscreenTimeDisplay: document.getElementById('fullscreen-time-display'),
                 fullscreenSubjectGoal: document.getElementById('fullscreen-subject-goal'),
                 fullscreenBtn: document.getElementById('fullscreen-btn'),
+                
+                // Settings UI elements
+                newSubjectInput: document.getElementById('new-subject-input'),
+                subjectsListManager: document.getElementById('subjects-list-manager'),
             };
 
             // --- LOCAL STORAGE LOGIC ---
 
             /** Loads state from localStorage or initializes default state. */
-            function loadState() {
+         function loadState() {
                 try {
                     const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
                     if (storedState) {
@@ -551,7 +604,7 @@
                                 // For free-form, add the time difference to elapsed time
                                 state.timeElapsed += timeSinceStart;
                             }
-                            state.isRunning = false; 
+                            // state.isRunning = false; // <-- REMOVED THIS LINE
                         }
                     }
                 } catch (error) {
@@ -570,7 +623,7 @@
                         timeElapsed: state.timeElapsed,
                         startTime: state.startTime,
                         currentSubject: state.currentSubject,
-                        sessionGoal: D.taskInput.value,
+                        sessionGoal: D.taskInput ? D.taskInput.value : state.sessionGoal,
                         sessions: state.sessions,
                         tasks: state.tasks,
                         currentPage: state.currentPage,
@@ -579,6 +632,7 @@
                         isPomodoroActive: state.isPomodoroActive,
                         pomodoroMode: state.pomodoroMode,
                         pomodoroTimeRemaining: state.pomodoroTimeRemaining,
+                        subjects: state.subjects, // SAVE DYNAMIC SUBJECTS
                     };
                     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
                 } catch (error) {
@@ -587,6 +641,7 @@
             }
             
             // --- TIME & DATE UTILITIES ---
+
             /** Formats seconds into H:MM:SS string. */
             function formatTime(totalSeconds, includeHours) {
                 const totalSec = Math.max(0, Math.floor(totalSeconds)); // Ensure it's not negative
@@ -616,7 +671,7 @@
             // Helper for weekly/monthly comparisons
             function formatComparison(current, previous, unit) {
                 if (previous === 0) {
-                    return 'No previous data';
+                    return `<span class="text-gray-400">No previous ${unit} data</span>`;
                 }
                 const change = current - previous;
                 const percentChange = (change / previous) * 100;
@@ -664,8 +719,9 @@
                 });
             }
             
+            // UPDATED to use state.subjects
             function getSubjectColorClass(subjectId) {
-                const subject = SUBJECTS.find(s => s.id === subjectId);
+                const subject = state.subjects.find(s => s.id === subjectId);
                 return subject ? `text-${subject.color}-400` : 'text-gray-400';
             }
             
@@ -697,7 +753,7 @@
                 return new Date(0); 
             }
 
-            // --- ACHIEVEMENT/PROGRESS CALCULATION LOGIC (MODIFIED) ---
+            // --- ACHIEVEMENT/PROGRESS CALCULATION LOGIC ---
             
             function calculateAllStats() {
                 const now = new Date();
@@ -716,6 +772,7 @@
                 let prevWeeklyTime = 0;
                 
                 let dailyTimeInWeek = Array(7).fill(0);
+                let totalSessionsCount = 0; 
                 
                 // 1. Calculate Time Metrics
                 state.sessions.forEach(session => {
@@ -723,6 +780,7 @@
                     const duration = session.durationSeconds;
                     
                     overallTime += duration;
+                    totalSessionsCount += 1; 
                     
                     if (sessionTime >= startOfMonth) {
                         monthlyTime += duration;
@@ -757,6 +815,9 @@
                 const daysSinceStart = Math.ceil((startOfToday - new Date(firstSessionTimestamp).setHours(0,0,0,0)) / (1000 * 3600 * 24)) || 1;
                 const avgDailyHours = overallTime / 3600 / daysSinceStart;
 
+                // Calculate Average Session Length
+                const avgSessionLengthSeconds = totalSessionsCount > 0 ? overallTime / totalSessionsCount : 0; 
+
                 // 4. Update stats object
                 stats.overallTime = overallTime;
                 stats.monthlyTime = monthlyTime;
@@ -768,6 +829,7 @@
                 stats.totalTasks = totalTasks;
                 stats.efficiency = efficiency;
                 stats.avgDailyHours = avgDailyHours; 
+                stats.avgSessionLengthSeconds = avgSessionLengthSeconds; 
                 
                 // 5. Check Achievements
                 stats.achievements = checkAchievementStatus(overallTime, tasksCompleted);
@@ -803,7 +865,7 @@
                 return status;
             }
             
-            // --- BROWN NOISE GENERATION FIX (Bug 2) ---
+            // --- BROWN NOISE GENERATION ---
             
             /** Creates a brown noise AudioBufferSourceNode. */
             function createBrownNoiseGenerator() {
@@ -835,8 +897,8 @@
                 return source;
             }
             
-            /** Toggles the playback of brown noise. (Bug 2 Fix) */
-            window.toggleBrownNoise = async () => {
+            /** Toggles the playback of brown noise. */
+            function toggleBrownNoise() {
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
@@ -856,7 +918,7 @@
                 } else {
                     // Start the noise
                     if (audioContext.state === 'suspended') {
-                        await audioContext.resume();
+                        audioContext.resume();
                     }
                     // Create a new generator and start it
                     brownNoiseGenerator = createBrownNoiseGenerator();
@@ -870,7 +932,7 @@
             // --- POMODORO LOGIC ---
 
             /** Toggles Pomodoro mode on/off. */
-            window.togglePomodoro = () => {
+            function togglePomodoro() {
                 if (state.isRunning) {
                     // Use custom modal instead of alert
                     const modal = D.detailsModal;
@@ -941,7 +1003,6 @@
                     return;
                 }
                 
-                // FIX: Removed the blocking 'confirm' dialog that was causing the play button to fail.
                 if ((!state.isPomodoroActive || state.pomodoroMode === 'focus') && !D.taskInput.value.trim() && state.timeElapsed === 0) {
                     console.warn("Starting session without a goal set.");
                 }
@@ -960,7 +1021,6 @@
                     }
 
                     const now = Date.now();
-                    // Use a fixed 1-second interval for clean countdown
                     
                     if (state.isPomodoroActive) {
                         // POMODORO COUNTDOWN LOGIC
@@ -1022,9 +1082,9 @@
                 state.pomodoroMode = 'focus';
                 state.pomodoroTimeRemaining = POMODORO_FOCUS_SECONDS;
 
-                // Stop brown noise if it's playing (Uses Bug 2 Fix)
+                // Stop brown noise if it.s playing
                 if (isNoisePlaying) {
-                    window.toggleBrownNoise();
+                    toggleBrownNoise();
                 }
 
                 renderUI();
@@ -1033,7 +1093,7 @@
             }
 
             function logSession(fixedDuration = null) {
-                const subject = SUBJECTS.find(s => s.id === state.currentSubject);
+                const subject = state.subjects.find(s => s.id === state.currentSubject);
                 // Determine duration: Use fixedDuration (for Pomodoro focus) or elapsed time (for free-form)
                 const duration = fixedDuration !== null ? fixedDuration : Math.floor(state.timeElapsed);
 
@@ -1042,8 +1102,8 @@
 
                 const sessionLog = {
                     id: Date.now(),
-                    subject: subject.name,
-                    subjectId: subject.id,
+                    subject: subject ? subject.name : 'Unknown Subject',
+                    subjectId: subject ? subject.id : 'unknown',
                     durationSeconds: duration,
                     goal: D.taskInput.value.trim() || 'No Goal Set',
                     timestamp: new Date().toISOString(),
@@ -1099,10 +1159,11 @@
                 D.tasksView.classList.add('hidden');
                 D.historyView.classList.add('hidden');
                 D.achievementsView.classList.add('hidden');
-                D.progressView.classList.add('hidden'); // NEW
+                D.progressView.classList.add('hidden'); 
+                D.settingsView.classList.add('hidden'); // New setting view
 
                 // Reset nav button styles
-                [D.navTimerBtn, D.navTasksBtn, D.navHistoryBtn, D.navAchievementsBtn, D.navProgressBtn].forEach(btn => { // Updated list
+                [D.navTimerBtn, D.navTasksBtn, D.navHistoryBtn, D.navAchievementsBtn, D.navProgressBtn, D.navSettingsBtn].forEach(btn => { 
                     btn.classList.remove('bg-indigo-600');
                     btn.classList.add('bg-gray-700/50');
                 });
@@ -1131,11 +1192,17 @@
                         D.navAchievementsBtn.classList.add('bg-indigo-600');
                         renderAchievements(); // Renders trophies
                         break;
-                    case 'progress': // NEW
+                    case 'progress': 
                         D.progressView.classList.remove('hidden');
                         D.navProgressBtn.classList.remove('bg-gray-700/50');
                         D.navProgressBtn.classList.add('bg-indigo-600');
                         renderProgress(); // Renders metrics
+                        break;
+                    case 'settings': 
+                        D.settingsView.classList.remove('hidden');
+                        D.navSettingsBtn.classList.remove('bg-gray-700/50');
+                        D.navSettingsBtn.classList.add('bg-indigo-600');
+                        renderSubjectManager(); // Renders the subject management UI
                         break;
                 }
                 renderUI();
@@ -1170,12 +1237,15 @@
             /** Updates the timer, controls, and noise button states. */
             function renderUI() {
                 const isRunning = state.isRunning;
-                const subject = SUBJECTS.find(s => s.id === state.currentSubject);
+                const subject = state.subjects.find(s => s.id === state.currentSubject);
 
                 // --- TIMER DISPLAY LOGIC (Handles Pomodoro Countdown) ---
                 let timeToDisplay = state.isPomodoroActive ? state.pomodoroTimeRemaining : state.timeElapsed;
                 const timeStr = formatTime(timeToDisplay, true);
-                const subjectColorClass = getSubjectColorClass(subject.id);
+                
+                // Use a default subject/color if the current one was deleted
+                const subjectName = subject ? subject.name : 'Select Subject';
+                const subjectColorClass = subject ? getSubjectColorClass(subject.id) : 'text-gray-400';
 
                 // Update main title based on mode
                 if (state.isPomodoroActive) {
@@ -1199,8 +1269,8 @@
                     D.fullscreenTimeDisplay.textContent = timeStr;
                     D.fullscreenTimeDisplay.className = `text-[12rem] lg:text-[18rem] xl:text-[25rem] font-extrabold tabular-nums tracking-tighter ${displayColorClass.replace('text-', 'text-')} transition-colors`;
                     D.fullscreenSubjectGoal.textContent = state.isPomodoroActive 
-                        ? (state.pomodoroMode === 'focus' ? `${subject.name} | Goal: ${D.taskInput.value.trim() || 'Focus Goal'}` : 'BREAK TIME - STAND UP!') 
-                        : `${subject.name} | ${D.taskInput.value.trim() || 'Focus Goal'}`;
+                        ? (state.pomodoroMode === 'focus' ? `${subjectName} | Goal: ${D.taskInput.value.trim() || 'Focus Goal'}` : 'BREAK TIME - STAND UP!') 
+                        : `${subjectName} | ${D.taskInput.value.trim() || 'Focus Goal'}`;
                 }
 
                 // Input/Selector Control
@@ -1213,10 +1283,13 @@
                 });
 
                 // Start/Pause Button
-                D.startPauseBtn.innerHTML = isRunning ? '<i data-lucide="square" class="w-6 h-6"></i>' : '<i data-lucide="play" class="w-6 h-6"></i>';
+                D.startPauseBtn.innerHTML = isRunning ? '<i data-lucide="square" class="w-8 h-8"></i>' : '<i data-lucide="play" class="w-8 h-8"></i>';
                 D.startPauseBtn.className = `p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 ${
                     isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
                 }`;
+                // Apply custom mobile size style (defined in <style> block)
+                D.startPauseBtn.id = "start-pause-btn"; 
+
 
                 // Reset Button: disabled if running, or if free-form time is 0 AND pomodoro is inactive
                 D.resetBtn.disabled = isRunning || (!state.isPomodoroActive && state.timeElapsed === 0);
@@ -1235,7 +1308,7 @@
                 D.fullscreenBtn.classList.toggle('opacity-50', isTimerEmpty);
                 D.fullscreenBtn.classList.toggle('cursor-not-allowed', isTimerEmpty);
 
-                // Noise Button (Uses Bug 2 Fix logic)
+                // Noise Button
                 D.noiseBtn.className = `p-2 rounded-full transition-colors ${
                     isNoisePlaying ? 'bg-amber-500 text-black hover:bg-amber-400' : 'text-gray-400 hover:bg-white/10'
                 }`;
@@ -1250,13 +1323,18 @@
 
             // --- SUBJECT & HISTORY RENDERING ---
 
+            // UPDATED to use state.subjects
             function setupSubjectSelector() {
-                // FIX 1: Removed inline style from label to rely purely on CSS checked selector.
-                D.subjectSelector.innerHTML = SUBJECTS.map(subject => `
-                    <input type="radio" id="sub-${subject.id}" name="subject" value="${subject.id}" class="hidden subject-radio" ${state.currentSubject === subject.id ? 'checked' : ''} />
-                    <label for="sub-${subject.id}" class="block w-full text-center py-2 px-1 rounded-xl cursor-pointer text-sm font-semibold transition-colors border border-gray-700/50 text-gray-400 hover:bg-white/10">
-                        ${subject.name}
-                    </label>
+                // ADDED: w-1/2 or w-1/3 classes for responsive wrapping on small screens
+                const itemWidthClass = state.subjects.length <= 4 ? 'w-full sm:w-1/4' : 'w-1/2 sm:w-1/5';
+                
+                D.subjectSelector.innerHTML = state.subjects.map(subject => `
+                    <div class="${itemWidthClass} p-0.5">
+                        <input type="radio" id="sub-${subject.id}" name="subject" value="${subject.id}" class="hidden subject-radio" ${state.currentSubject === subject.id ? 'checked' : ''} />
+                        <label for="sub-${subject.id}" class="block w-full text-center py-2 px-1 rounded-full cursor-pointer text-sm font-semibold transition-colors border border-gray-700/50 text-gray-400 hover:bg-white/10">
+                            ${subject.name}
+                        </label>
+                    </div>
                 `).join('');
                 
                 // Add event listeners to update state when a subject is selected
@@ -1281,9 +1359,10 @@
 
                 sessionsToShow.forEach(session => {
                     const duration = formatMinutes(session.durationSeconds);
+                    // Handle case where subject may have been deleted (use fallback)
                     const subjectClass = getSubjectColorClass(session.subjectId).replace('text-', 'border-');
                     const html = `
-                        <div onclick="window.showSessionDetails(${session.id})" class="flex items-center justify-between p-3 bg-gray-700/50 rounded-xl cursor-pointer hover:bg-gray-700 transition-colors border-l-4 ${subjectClass}">
+                        <div onclick="showSessionDetails(${session.id})" class="flex items-center justify-between p-3 bg-gray-700/50 rounded-2xl cursor-pointer hover:bg-gray-700 transition-colors border-l-4 ${subjectClass}">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold truncate text-white">${session.subject}: ${session.goal}</p>
                                 <p class="text-xs text-gray-400">${new Date(session.timestamp).toLocaleTimeString()} · ${duration}</p>
@@ -1299,10 +1378,14 @@
                 // 1. Populate the date selector
                 const sessionDates = state.sessions.map(s => getFormattedDate(s.timestamp));
                 
-                // Collect completion dates from tasks (Bug 3 Fix)
+                // Collect completion and creation dates from tasks
                 const taskDates = state.tasks
-                    .filter(t => t.completed && t.completedAt)
-                    .map(t => getFormattedDate(t.completedAt));
+                    .map(t => [
+                        getFormattedDate(t.createdAt), 
+                        t.completed ? getFormattedDate(t.completedAt) : null
+                    ])
+                    .flat()
+                    .filter(d => d !== null);
                     
                 const allDates = [...sessionDates, ...taskDates].filter(d => d !== null);
                 const uniqueDates = [...new Set(allDates)].sort().reverse();
@@ -1324,7 +1407,7 @@
                 renderDailySummary(selectedDate);
             }
             
-            /** Renders the session and task summary for a selected date. (Bug 3 Fix) */
+            /** Renders the session and task summary for a selected date. */
             function renderDailySummary(dateKey) {
                 if (!dateKey) {
                     D.dailySummaryContainer.innerHTML = '<p class="text-center text-gray-500 text-sm py-4">Select a date above to view your summary.</p>';
@@ -1339,7 +1422,7 @@
                     const duration = formatMinutes(session.durationSeconds);
                     const subjectClass = getSubjectColorClass(session.subjectId).replace('text-', 'border-');
                     return `
-                        <div onclick="window.showSessionDetails(${session.id})" class="flex items-start p-3 bg-gray-800/50 rounded-xl cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 ${subjectClass}">
+                        <div onclick="showSessionDetails(${session.id})" class="flex items-start p-3 bg-gray-800/50 rounded-2xl cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 ${subjectClass}">
                             <i data-lucide="clock" class="w-5 h-5 mr-3 text-indigo-400 flex-shrink-0 mt-1"></i>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold truncate text-white">${session.subject} - ${duration}</p>
@@ -1349,21 +1432,38 @@
                     `;
                 }).join('');
                 
-                // 2. Filter and display COMPLETED TASKS (Bug 3 Fix)
-                const completedTasks = state.tasks
-                    .filter(t => t.completed && t.completedAt && getFormattedDate(t.completedAt) === dateKey);
+                // 2. Filter and display TASKS created on this day (both complete and incomplete)
+                const tasksCreatedToday = state.tasks
+                    .filter(t => getFormattedDate(t.createdAt) === dateKey);
 
-                const taskListHTML = completedTasks.map(task => `
-                    <div class="flex items-center p-3 text-sm bg-gray-700/50 rounded-xl border border-emerald-600/50">
+                const incompleteTasks = tasksCreatedToday
+                    .filter(t => !t.completed);
+
+                const completedTasks = tasksCreatedToday
+                    .filter(t => t.completed);
+
+                // HTML for Incomplete Tasks
+                const incompleteTaskListHTML = incompleteTasks.map(task => `
+                    <div class="flex items-center p-3 text-sm bg-gray-800/50 rounded-2xl border border-red-600/50">
+                        <i data-lucide="alert-circle" class="w-5 h-5 mr-3 text-red-400 flex-shrink-0"></i>
+                        <span class="text-gray-300">${task.text}</span>
+                        <span class="ml-auto text-xs text-red-400">Pending</span>
+                    </div>
+                `).join('');
+
+                // HTML for Completed Tasks (uses the list filtered by creation date)
+                const completedTaskListHTML = completedTasks.map(task => `
+                    <div class="flex items-center p-3 text-sm bg-gray-700/50 rounded-2xl border border-emerald-600/50">
                         <i data-lucide="check-circle" class="w-5 h-5 mr-3 text-emerald-400 flex-shrink-0"></i>
                         <span class="text-gray-300 line-through">${task.text}</span>
+                        <span class="ml-auto text-xs text-gray-400">${new Date(task.completedAt).toLocaleTimeString()}</span>
                     </div>
                 `).join('');
 
 
                 // 3. Construct the final HTML
                 D.dailySummaryContainer.innerHTML = `
-                    <div class="glass-base p-4 rounded-xl shadow-inner bg-gray-900/40">
+                    <div class="glass-base p-4 rounded-2xl shadow-inner bg-gray-900/40">
                         <h3 class="text-xl font-bold mb-2 text-indigo-300">Total Focus:</h3>
                         <p class="text-5xl font-extrabold text-emerald-400 tabular-nums">${formatMinutes(totalDailyFocusSeconds)}</p>
                         <p class="text-sm text-gray-500 mt-1">${formatDateForDisplay(dateKey)}</p>
@@ -1377,10 +1477,21 @@
                     </div>
 
                     <h3 class="text-xl font-semibold text-gray-300 mt-6 mb-3 border-b border-gray-700 pb-2 flex items-center">
-                        <i data-lucide="check-square" class="w-5 h-5 mr-2"></i> Completed Tasks (${completedTasks.length})
+                        <i data-lucide="list" class="w-5 h-5 mr-2"></i> Tasks Created (${tasksCreatedToday.length})
                     </h3>
+                    
+                    <h4 class="text-lg font-medium text-red-300 mt-4 mb-2 flex items-center">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 mr-1"></i> Incomplete (${incompleteTasks.length})
+                    </h4>
                     <div class="space-y-3">
-                        ${taskListHTML || '<p class="text-gray-500 text-center py-2">No tasks completed on this day.</p>'}
+                        ${incompleteTaskListHTML || '<p class="text-gray-500 text-center py-2">No incomplete tasks created on this day.</p>'}
+                    </div>
+                    
+                    <h4 class="text-lg font-medium text-emerald-300 mt-4 mb-2 flex items-center">
+                        <i data-lucide="check" class="w-4 h-4 mr-1"></i> Completed (${completedTasks.length})
+                    </h4>
+                    <div class="space-y-3">
+                        ${completedTaskListHTML || '<p class="text-gray-500 text-center py-2">No completed tasks created on this day.</p>'}
                     </div>
                 `;
                 
@@ -1397,7 +1508,7 @@
                         text: text,
                         completed: false,
                         createdAt: new Date().toISOString(),
-                        completedAt: null // Bug 3 Fix: Initialize timestamp for completion
+                        completedAt: null 
                     };
                     state.tasks.push(newTask);
                     D.taskInputNew.value = '';
@@ -1412,7 +1523,7 @@
                 if (task) {
                     task.completed = !task.completed;
                     
-                    // Bug 3 Fix: Add/Remove completion timestamp
+                    // Add/Remove completion timestamp
                     if (task.completed) {
                         task.completedAt = new Date().toISOString();
                     } else {
@@ -1445,19 +1556,19 @@
                     const textClass = isPending ? 'text-white' : 'text-gray-300 line-through';
 
                     return `
-                        <div id="task-${task.id}" class="flex items-start p-3 rounded-xl transition-all ${bgClass} border">
+                        <div id="task-${task.id}" class="flex items-start p-3 rounded-2xl transition-all ${bgClass} border">
                             <input 
                                 type="checkbox" 
                                 id="check-${task.id}" 
                                 class="mt-1 flex-shrink-0" 
                                 ${task.completed ? 'checked' : ''} 
-                                onclick="window.toggleTask(${task.id})"
+                                onclick="toggleTask(${task.id})"
                             >
                             <label for="check-${task.id}" class="flex-1 ml-3 cursor-pointer">
-                                <span class="block text-sm font-medium ${textClass}">${task.text}</span>
+                                <span class="block text-base font-medium ${textClass}">${task.text}</span>
                                 <span class="text-xs text-gray-500">${new Date(task.createdAt).toLocaleDateString()}</span>
                             </label>
-                            <button onclick="window.deleteTask(${task.id})" class="p-1 rounded-full text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 ml-4">
+                            <button onclick="deleteTask(${task.id})" class="p-1 rounded-full text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 ml-4">
                                 <i data-lucide="trash-2" class="w-5 h-5"></i>
                             </button>
                         </div>
@@ -1501,10 +1612,10 @@
 
                     const iconClass = isComplete ? `${ach.color}` : 'text-gray-500';
                     const progressBg = isComplete ? 'bg-emerald-600' : 'bg-indigo-600';
-                    const progressText = isComplete ? 'Completed!' : `${status.progress}/${status.goal}`;
+                    const progressText = isComplete ? 'Completed!' : `${status.progress}/${status.goal} ${ach.unit}`;
 
                     return `
-                        <div class="glass-base p-5 rounded-xl shadow-lg bg-gray-800/50 border-gray-700/50 flex flex-col justify-between h-full">
+                        <div class="glass-base p-5 rounded-2xl shadow-lg bg-gray-800/50 border-gray-700/50 flex flex-col justify-between h-full">
                             <div>
                                 <div class="flex items-center mb-3">
                                     <i data-lucide="${ach.icon}" class="w-8 h-8 mr-3 ${iconClass} flex-shrink-0"></i>
@@ -1529,7 +1640,7 @@
                 window.createLucideIcons();
             }
             
-            // --- PROGRESS RENDERING (Metrics) ---
+            // --- PROGRESS RENDERING (Metrics & Area Chart) ---
             function renderProgress() {
                 if (state.currentPage !== 'progress') return;
                 calculateAllStats();
@@ -1542,6 +1653,13 @@
                         value: formatMinutes(stats.overallTime), 
                         color: 'text-indigo-400',
                         subtext: 'Across all sessions'
+                    },
+                    { 
+                        name: 'Average Session Length', 
+                        icon: 'clock-3', 
+                        value: formatMinutes(stats.avgSessionLengthSeconds), 
+                        color: 'text-yellow-400',
+                        subtext: state.sessions.length > 0 ? `From ${state.sessions.length} sessions` : 'No sessions logged' 
                     },
                     { 
                         name: 'Monthly Focus Time', 
@@ -1581,10 +1699,10 @@
                 ];
 
                 const metricsHTML = progressMetrics.map(metric => `
-                    <div class="glass-base p-5 rounded-xl shadow-lg bg-gray-800/50 border-gray-700/50">
+                    <div class="glass-base p-4 sm:p-5 rounded-2xl shadow-lg bg-gray-800/50 border-gray-700/50">
                         <div class="flex items-center justify-between">
-                            <i data-lucide="${metric.icon}" class="w-8 h-8 ${metric.color}"></i>
-                            <span class="text-3xl font-extrabold text-white tabular-nums">${metric.value}</span>
+                            <i data-lucide="${metric.icon}" class="w-7 h-7 ${metric.color}"></i>
+                            <span class="text-2xl sm:text-3xl font-extrabold text-white tabular-nums">${metric.value}</span>
                         </div>
                         <p class="text-gray-400 text-sm mt-3 flex justify-between items-center">
                             ${metric.name}
@@ -1595,25 +1713,92 @@
                 
                 D.metricsContainer.innerHTML = metricsHTML;
                 
-                // 2. Weekly Breakdown Chart (Simple Bar Chart)
+                // 2. Weekly Breakdown Area Chart (using SVG)
                 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                const maxTime = Math.max(...stats.dailyTimeInWeek, 1); // Avoid division by zero
+                const maxTimeSeconds = Math.max(...stats.dailyTimeInWeek);
+                // Ensure maxTime is at least 1 to avoid division by zero
+                const maxTime = maxTimeSeconds || 1; 
+                
+                // Calculate normalized (X, Y) points (normalized to 0-100)
+                const points = stats.dailyTimeInWeek.map((time, index) => {
+                    // Spread points evenly across the X-axis (0, 16.66, 33.33, ..., 100)
+                    const x = (index / 6) * 100; 
+                    // Normalize time to a 0-100 scale, then invert for SVG (Y=0 is top). 
+                    // Clamp between 5 (for visual padding at the top) and 95 (for padding at the bottom baseline)
+                    const normalizedY = 100 - (time / maxTime) * 90; // Use 90% range for padding
+                    const y = Math.min(95, Math.max(10, normalizedY)); 
+                    return { x, y, time };
+                });
+
+                // 1. Create the path string for the Area Chart (closed polygon)
+                const areaPathPoints = points.map(p => `${p.x} ${p.y}`).join(' L ');
+                // Starts at bottom-left, follows points, ends at bottom-right, closes path
+                const areaPath = `M 0 95 L ${areaPathPoints} L 100 95 Z`;
+
+                // 2. Create the polyline points string for the Line Graph (just the line)
+                const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+
+                // 3. Create the circles/dots for data points and tooltips
+                const circlesHTML = points.map((p, index) => {
+                    const duration = formatMinutes(p.time);
+                    
+                    return `
+                        <circle 
+                            cx="${p.x}" 
+                            cy="${p.y}" 
+                            r="3" 
+                            class="fill-indigo-400 stroke-gray-900 stroke-1 hover:fill-amber-400 transition-all duration-200"
+                        >
+                             <title>${dayLabels[index]}: ${duration}</title>
+                        </circle>
+                    `;
+                }).join('');
+                
+                // Calculate max/min time values for labels
+                const maxTimeValue = maxTimeSeconds > 0 ? formatMinutes(maxTimeSeconds) : "0 min";
                 
                 const breakdownHTML = `
-                    <div class="flex items-end h-32 space-x-2">
-                        ${stats.dailyTimeInWeek.map((time, index) => {
-                            const heightPercent = Math.max(5, (time / maxTime) * 100);
-                            const duration = formatMinutes(time);
-                            const barColor = time > 0 ? 'bg-indigo-500' : 'bg-gray-700';
+                    <div class="h-48 relative">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full">
                             
-                            return `
-                                <div class="flex flex-col items-center flex-1 h-full relative group">
-                                    <div class="w-full ${barColor} rounded-t transition-all duration-300" style="height: ${heightPercent}%;"></div>
-                                    <div class="text-xs text-gray-400 mt-1">${dayLabels[index]}</div>
-                                    <div class="absolute bottom-full mb-1 p-1 bg-gray-700 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">${duration}</div>
-                                </div>
-                            `;
-                        }).join('')}
+                            <path 
+                                d="${areaPath}" 
+                                fill="url(#areaGradient)" 
+                                class="transition-all duration-700"
+                            />
+                            
+                            <defs>
+                                <linearGradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.4"/>
+                                    <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.05"/>
+                                </linearGradient>
+                            </defs>
+                            
+                            <line x1="0" y1="95" x2="100" y2="95" stroke="#4b5563" stroke-width="0.5"/> 
+                            <line x1="0" y1="52.5" x2="100" y2="52.5" stroke="#4b5563" stroke-width="0.25" stroke-dasharray="3 3"/>
+                            
+                            <polyline 
+                                points="${polylinePoints}" 
+                                fill="none" 
+                                stroke="#6366f1" 
+                                stroke-width="2.5" 
+                                stroke-linecap="round" 
+                                stroke-linejoin="round"
+                            />
+                            
+                            ${circlesHTML}
+                        </svg>
+                        
+                        <div class="absolute top-0 left-0 text-xs text-indigo-300 transform -translate-y-1/2">
+                            Max: ${maxTimeValue}
+                        </div>
+                         <div class="absolute bottom-0 left-0 text-xs text-gray-400 transform translate-y-full">
+                            Min: 0 min
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-400 font-medium mt-3 px-1">
+                        ${dayLabels.map(label => `<span class="text-center flex-1">${label}</span>`).join('')}
                     </div>
                 `;
 
@@ -1622,9 +1807,103 @@
                 window.createLucideIcons();
             }
 
+            // --- SUBJECT MANAGEMENT LOGIC (NEW) ---
+
+            /** Finds an unused color for a new subject. */
+            function getUnusedColor() {
+                const usedColors = state.subjects.map(s => s.color);
+                return SUBJECT_COLORS.find(c => !usedColors.includes(c)) || 'purple'; 
+            }
+
+            /** Handler for adding a subject from input. */
+            function addSubjectHandler() {
+                const name = D.newSubjectInput.value.trim();
+                if (!name) return;
+
+                if (state.subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+                    alert("Subject already exists!");
+                    return;
+                }
+
+                const newSubject = {
+                    id: name.toLowerCase().replace(/\s+/g, '-'),
+                    name: name,
+                    color: getUnusedColor()
+                };
+                
+                // Check if the ID is unique, if not, append a number
+                let idCounter = 1;
+                let newId = newSubject.id;
+                while(state.subjects.some(s => s.id === newId)) {
+                    newId = `${newSubject.id}-${idCounter++}`;
+                }
+                newSubject.id = newId;
+
+                state.subjects.push(newSubject);
+                D.newSubjectInput.value = '';
+                saveState();
+                renderSubjectManager();
+                setupSubjectSelector();
+            }
+
+            /** Deletes a subject from the state. */
+            function deleteSubject(subjectId) {
+                if (state.subjects.length <= 1) {
+                    alert("Cannot delete the last subject. You must have at least one.");
+                    return;
+                }
+                if (state.currentSubject === subjectId) {
+                    alert("Cannot delete the currently selected subject. Please switch subjects on the Timer tab first.");
+                    return;
+                }
+                
+                if (confirm(`Are you sure you want to delete the subject "${state.subjects.find(s => s.id === subjectId).name}"? All associated historical data will remain, but new sessions cannot be logged under it.`)) {
+                    state.subjects = state.subjects.filter(s => s.id !== subjectId);
+                    
+                    saveState();
+                    renderSubjectManager();
+                    setupSubjectSelector();
+                    renderUI(); // Update timer UI
+                }
+            }
+
+            /** Renders the list of subjects in the Settings view. */
+            function renderSubjectManager() {
+                if (state.currentPage !== 'settings') return;
+
+                const listHTML = state.subjects.map(subject => {
+                    const isCurrent = subject.id === state.currentSubject;
+                    const canDelete = state.subjects.length > 1 && !isCurrent;
+                    
+                    const colorClass = getSubjectColorClass(subject.id);
+
+                    return `
+                        <div class="flex items-center p-3 bg-gray-700/50 rounded-2xl border border-gray-600/50">
+                            <i data-lucide="book-open" class="w-5 h-5 mr-3 ${colorClass}"></i>
+                            <span class="text-white font-medium flex-1">${subject.name}</span>
+                            
+                            ${isCurrent ? 
+                                '<span class="text-xs text-indigo-400 font-semibold mr-3">CURRENT</span>' : 
+                                '<span class="text-xs text-gray-500 mr-3">ID: ' + subject.id + '</span>'}
+                                
+                            <button 
+                                onclick="deleteSubject('${subject.id}')" 
+                                class="p-1 rounded-full text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 ml-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                                ${!canDelete ? 'disabled' : ''}
+                            >
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+                D.subjectsListManager.innerHTML = listHTML || '<p class="text-center text-gray-500 text-sm py-4">No subjects defined.</p>';
+                window.createLucideIcons();
+            }
+            
             // --- MODAL & FULLSCREEN LOGIC ---
 
-            window.toggleFullscreenClock = () => {
+            function toggleFullscreenClock() {
                 if (D.fullscreenBtn.disabled) return;
 
                 const isHidden = D.fullscreenClockModal.classList.contains('hidden');
@@ -1650,9 +1929,9 @@
                     }
                 }
                 renderUI(); // Re-render to update the time display inside the modal
-            };
+            }
 
-            window.showSessionDetails = (sessionId) => {
+            function showSessionDetails(sessionId) {
                 const session = state.sessions.find(s => s.id === sessionId);
                 if (session) {
                     const duration = formatMinutes(session.durationSeconds);
@@ -1668,14 +1947,22 @@ Goal: ${session.goal}
                     D.modalContent.textContent = content.trim();
                     D.detailsModal.classList.remove('hidden');
                 }
-            };
+            }
             
-            // --- EXPOSE GLOBAL FUNCTIONS ---
+            // --- EXPOSE GLOBAL FUNCTIONS (Required by HTML onclick) ---
             window.switchPage = switchPage;
+            window.toggleBrownNoise = toggleBrownNoise;
+            window.togglePomodoro = togglePomodoro;
+            window.toggleFullscreenClock = toggleFullscreenClock;
             window.addTask = addTask;
             window.toggleTask = toggleTask;
             window.deleteTask = deleteTask;
             window.handleDateChange = renderDailySummary; 
+            window.showSessionDetails = showSessionDetails;
+            window.addSubjectHandler = addSubjectHandler; // Exposed handler
+            window.deleteSubject = deleteSubject; // Exposed function
+            
+            // Handlers for timer buttons 
             window.startPauseHandler = () => {
                 if (state.isRunning) {
                     stopTimer();
@@ -1684,10 +1971,11 @@ Goal: ${session.goal}
                 }
             };
             window.resetTimer = resetTimer;
-            
+
             // --- INITIALIZATION ---
             
-            window.onload = () => {
+            // Execute initialization when the DOM is ready (Replaces the old window.onload logic)
+            document.addEventListener('DOMContentLoaded', () => {
                 loadState();
                 setupSubjectSelector();
                 renderHistory();
@@ -1702,9 +1990,7 @@ Goal: ${session.goal}
                 }
                 
                 renderViews(); // Initialize the correct view (timer, tasks, or history)
-            };
-        })(); // End of IIFE
+            });
     </script>
-    <footer>© Copyright 2025 <a href='https://studyytracker.netlify.app'>Studyy Tracker</a></footer>
 </body>
 </html>
