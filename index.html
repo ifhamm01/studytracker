@@ -786,8 +786,8 @@
             }
         }
 
-        // TIMER LOGIC
-       function setTimerMode(mode) {
+      // TIMER LOGIC
+function setTimerMode(mode) {
     if (state.isRunning) {
         showToast('Stop or pause the current session before changing the timer mode.', 'error');
         return;
@@ -800,6 +800,25 @@
     state.pomodoroMode = 'focus';
     state.pomodoroTimeRemaining = PRESETS[mode].focus;
     state.timeElapsed = 0;
+    
+    // --- FIX: Initialize Background Timing State ---
+    
+    // Clear any previous timing context
+    state.pauseTime = 0; 
+    state.wasPaused = false;
+    
+    if (state.isPomodoroActive) {
+        // When setting a Pomodoro/Break mode, we initialize the startTime
+        // as if the timer had just started 'now' with 0 elapsed time.
+        // This is necessary because the tick() function now relies on startTime.
+        state.startTime = Date.now();
+    } else {
+        // For Free Mode, we want the count-up to start from when the user presses 'Start'
+        // but we still clear the previous startTime context.
+        state.startTime = 0; // Will be set to Date.now() when startPauseHandler is called
+    }
+    
+    // ---------------------------------------------
     
     // UI updates
     updateUI();
@@ -817,9 +836,7 @@
             // Apply active styles (Indigo color)
             btn.classList.add('bg-indigo-600/70', 'hover:bg-indigo-600');
             btn.classList.remove('bg-gray-700/50', 'hover:bg-gray-600/70');
-            // Ensure text color is white/light if needed, though usually handled by Tailwind's default text color
             btn.classList.add('text-white'); 
-
         } else {
             // Apply inactive styles (Gray color)
             btn.classList.remove('bg-indigo-600/70', 'hover:bg-indigo-600', 'text-white');
@@ -830,35 +847,49 @@
 }
 
         function startPauseHandler() {
-            if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
-                // Pomodoro ended, do not start/pause, wait for stopSession or next phase
-                return;
-            }
+    if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
+        // Pomodoro ended, do not start/pause, wait for stopSession or next phase
+        return;
+    }
 
-            if (state.isRunning) {
-                // Pause Logic
-                state.isRunning = false;
-                if (intervalId) {
-                    clearInterval(intervalId);
-                    intervalId = null;
-                }
-                state.startTime = null; // Clear start time on pause
-
-            } else {
-                // Start Logic
-                state.isRunning = true;
-                state.startTime = Date.now();
-                intervalId = setInterval(tick, 1000);
-                
-                // Initialize a new session if starting from 0 timeElapsed
-                if (state.timeElapsed === 0 && !state.isPomodoroActive) {
-                    // Free mode session starts now.
-                }
-
-            }
-            updateUI();
-            saveState();
+    if (state.isRunning) {
+        // --- PAUSE LOGIC ---
+        state.isRunning = false;
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
         }
+        
+        // FIX: Track the exact system time when paused
+        state.pauseTime = Date.now(); 
+        state.wasPaused = true; // Assuming you have this state property
+
+    } else {
+        // --- START/RESUME LOGIC ---
+        state.isRunning = true;
+
+        // If resuming (wasPaused is true):
+        if (state.wasPaused) {
+            const timeElapsedDuringPause = Date.now() - state.pauseTime;
+            // Shift the original startTime forward by the length of the pause
+            state.startTime += timeElapsedDuringPause; 
+            state.wasPaused = false;
+        } 
+        // If starting a brand new session:
+        else if (state.timeElapsed === 0 && !state.isPomodoroActive) {
+            // Set the start time. This is only reliable for Free Mode (timeElapsed=0).
+            state.startTime = Date.now();
+        }
+
+        intervalId = setInterval(tick, 1000);
+        
+        // Removed the 'Initialize a new session' logic as it's cleaner to handle 
+        // the initial setup elsewhere or assume state is ready here.
+    }
+    
+    updateUI();
+    saveState();
+}
 
         function tick() {
             if (!state.isRunning) return;
