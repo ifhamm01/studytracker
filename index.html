@@ -2090,34 +2090,43 @@ function exportCsvData() {
             updateMusicButton();
         }
 
-        // KEYBOARD SHORTCUTS
-       // Global keyboard shortcuts
-      // Global keyboard shortcuts
-       // Global keyboard shortcuts
-        // Global keyboard shortcuts
-        // Global keyboard shortcuts
+       
+      // --- KEYBOARD SHORTCUTS ---
         document.addEventListener('keydown', (e) => {
             
-            // --- Timer-Specific Shortcuts (Only on 'timer' page) ---
-            if (state.currentPage === 'timer') {
-                
-                // P: Start/Pause Session (Toggle)
-                if (e.key.toLowerCase() === 'p') {
-                    e.preventDefault();
-                    // If running, pause. Otherwise, call startSession (which handles starting or unpausing).
-                    if (state.isRunning) {
-                        pauseSession();
-                    } else {
-                        startSession();
-                    }
+            // --- CRITICAL FIX: Ignore Shortcuts When Typing ---
+            const element = e.target;
+            const tagName = element.tagName.toLowerCase();
+            
+            // Check if the focused element is a text entry field or content-editable
+            if (
+                tagName === 'input' ||
+                tagName === 'textarea' ||
+                tagName === 'select' ||
+                element.isContentEditable // Handles generic editable divs/elements
+            ) {
+                // Ignore the shortcut if the focused element is not disabled or read-only
+                if (!element.readOnly && !element.disabled) {
+                    return; 
                 }
+            }
+            // ----------------------------------------------------
+            
+            // Allow shortcuts only if a standard modifier key is NOT pressed
+            if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
                 
-                // S: Stop Session (Requires any active state)
-                if (e.key.toLowerCase() === 's' && (state.isRunning || state.isPaused)) {
+                // P or Spacebar: Play/Pause Timer
+                if (e.key.toLowerCase() === 'p' || e.key === ' ') {
+                    e.preventDefault();
+                    playPauseTimer();
+                }
+
+                // S: Stop Session (Requires timer is running)
+                if (e.key.toLowerCase() === 's' && state.isRunning) {
                     e.preventDefault();
                     stopSession();
                 }
-                
+
                 // D: Discard Session (Requires timer is NOT running AND there is time on the clock)
                 if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemainingTime() > 0) {
                     e.preventDefault();
@@ -2141,7 +2150,6 @@ function exportCsvData() {
                 }
             }
         });
-        // INITIALIZATION
 
        // INITIALIZATION
         document.addEventListener('DOMContentLoaded', () => {
