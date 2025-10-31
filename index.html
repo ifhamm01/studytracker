@@ -224,7 +224,7 @@
                     </div>
 
                     <div class="flex justify-center space-x-4 flex-wrap gap-2">
-                        <button id="start-pause-btn" onclick="playPauseTimer()" class="p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 bg-green-500 hover:bg-green-600">
+                        <button id="start-pause-btn" onclick="startPauseHandler()" class="p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 bg-green-500 hover:bg-green-600">
                             <i data-lucide="play" class="w-6 h-6"></i>
                         </button>
                         <button id="stop-btn" onclick="stopSession()" disabled class="p-4 rounded-full bg-red-600/70 hover:bg-red-600 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
@@ -557,7 +557,7 @@
             presetFreeBtn: document.getElementById('preset-free-btn'),
             preset255Btn: document.getElementById('preset-25-5-btn'),
             preset5010Btn: document.getElementById('preset-50-10-btn'),
-            sessionGoalInput: document.getElementById('session-goal-input'),
+            // End NEW
             historyList: document.getElementById('history-list'),
             noHistory: document.getElementById('no-history'),
             subjectSelector: document.getElementById('subject-selector'),
@@ -829,50 +829,36 @@
     saveState();
 }
 
-     function playPauseTimer() {
-    // If the timer is NOT running, this block handles the START action.
-    if (!state.isRunning) {
-        
-        // --- ROBUST VALIDATION CHECK ---
-        let goalText = '';
-        
-        // 1. Check if the input element exists and get its trimmed value
-        if (D.sessionGoalInput) {
-            goalText = D.sessionGoalInput.value.trim();
-        } else {
-            // Failsafe: If the element is not found, we treat it as an error
-            showToast('Error: Goal input field not found.', 'error');
-            return;
-        }
+        function startPauseHandler() {
+            if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
+                // Pomodoro ended, do not start/pause, wait for stopSession or next phase
+                return;
+            }
 
-        // 2. Check if the goal text is empty
-        if (goalText === '') {
-            showToast('Please enter a goal for your session before starting. 📝', 'error');
-            return; 
-        }
-        // ----------------------------------
-        
-        // If validation passes, save the current session details
-        state.currentSessionGoal = goalText;
-        state.currentSessionSubjectId = state.currentSubjectId;
-        state.currentSessionStartTime = Date.now();
-        
-        // Clear the goal input after saving the goal
-        D.sessionGoalInput.value = '';
+            if (state.isRunning) {
+                // Pause Logic
+                state.isRunning = false;
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+                state.startTime = null; // Clear start time on pause
 
-        // Start the timer
-        state.isRunning = true;
-        state.timerInterval = setInterval(onTick, 1000);
-        
-    } else {
-        // If the timer IS running, this block handles the PAUSE action.
-        state.isRunning = false;
-        clearInterval(state.timerInterval);
-    }
-    
-    updateUI();
-    saveState();
-}
+            } else {
+                // Start Logic
+                state.isRunning = true;
+                state.startTime = Date.now();
+                intervalId = setInterval(tick, 1000);
+                
+                // Initialize a new session if starting from 0 timeElapsed
+                if (state.timeElapsed === 0 && !state.isPomodoroActive) {
+                    // Free mode session starts now.
+                }
+
+            }
+            updateUI();
+            saveState();
+        }
 
         function tick() {
             if (!state.isRunning) return;
@@ -1134,7 +1120,7 @@
             // Fullscreen clock info
             const currentSubject = state.subjects.find(s => s.id === state.currentSubject);
             D.fullscreenSubjectGoal.textContent = `${currentSubject ? currentSubject.name : 'Subject'} | ${D.taskInput.value.trim() || 'No Goal'}`;
-
+            renderHistory('', '', 5);
             window.createLucideIcons();
         }
 
@@ -1442,50 +1428,61 @@
         }
 
         // HISTORY
-        function renderHistory(filterDate = '', searchTerm = '') {
-            let filteredSessions = [...state.sessions];
+        function renderHistory(filterDate = '', searchTerm = '', limit = 0) {
+    let filteredSessions = [...state.sessions];
 
-            if (filterDate) {
-                filteredSessions = filteredSessions.filter(s => getFormattedDate(s.timestamp) === filterDate);
-            }
-            
-            if (searchTerm) {
-                const searchLower = searchTerm.toLowerCase();
-                filteredSessions = filteredSessions.filter(s => 
-                    s.goal.toLowerCase().includes(searchLower) ||
-                    s.mode.toLowerCase().includes(searchLower) ||
-                    (state.subjects.find(sub => sub.id === s.subjectId)?.name || '').toLowerCase().includes(searchLower)
-                );
-            }
+    // **[NEW LOGIC START]**: Apply limit ONLY if no date or search filter is active.
+    if (limit > 0 && !filterDate && !searchTerm) {
+        filteredSessions = filteredSessions.slice(0, limit);
+    }
+    // **[NEW LOGIC END]**
 
-            if (filteredSessions.length === 0) {
-                D.historyList.innerHTML = '';
-                D.noHistory.classList.remove('hidden');
-                return;
-            }
-            
-            D.noHistory.classList.add('hidden');
-            
-            D.historyList.innerHTML = filteredSessions.map(session => {
-                const subject = state.subjects.find(s => s.id === session.subjectId);
-                const subjectName = subject ? subject.name : 'Unknown';
-                const subjectColor = subject ? subject.color : 'gray';
+    if (filterDate) {
+        filteredSessions = filteredSessions.filter(s => getFormattedDate(s.timestamp) === filterDate);
+    }
+    
+    if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredSessions = filteredSessions.filter(s => 
+            s.goal.toLowerCase().includes(searchLower) ||
+            s.mode.toLowerCase().includes(searchLower) ||
+            (state.subjects.find(sub => sub.id === s.subjectId)?.name || '').toLowerCase().includes(searchLower)
+        );
+    }
 
-                return `
-                    <div onclick="openModal('${session.id}')" class="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 border-${subjectColor}-500">
-                        <div class="flex-grow min-w-0">
-                            <p class="text-sm font-medium text-gray-300 truncate">${session.goal || 'No goal set'}</p>
-                            <p class="text-xs text-gray-400">
-                                <span class="capitalize text-${subjectColor}-400">${subjectName}</span> | ${session.mode}
-                            </p>
-                        </div>
-                        <p class="text-lg font-bold tabular-nums text-indigo-300 ml-4 flex-shrink-0">${formatTime(session.duration, false)}</p>
-                    </div>
-                `;
-            }).join('');
-            
-            window.createLucideIcons();
-        }
+    // Now, D.historyList must be cleared regardless of length, 
+    // since this function is also called for the full History Tab.
+    D.historyList.innerHTML = ''; // Ensure the container is cleared first
+
+    if (filteredSessions.length === 0) {
+        // D.historyList is already clear here
+        D.noHistory.classList.remove('hidden');
+        return;
+    }
+    
+    D.noHistory.classList.add('hidden');
+    
+    // The rest of the rendering logic remains the same:
+    D.historyList.innerHTML = filteredSessions.map(session => {
+        const subject = state.subjects.find(s => s.id === session.subjectId);
+        const subjectName = subject ? subject.name : 'Unknown';
+        const subjectColor = subject ? subject.color : 'gray';
+
+        return `
+            <div onclick="openModal('${session.id}')" class="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 border-${subjectColor}-500">
+                <div class="flex-grow min-w-0">
+                    <p class="text-sm font-medium text-gray-300 truncate">${session.goal || 'No goal set'}</p>
+                    <p class="text-xs text-gray-400">
+                        <span class="capitalize text-${subjectColor}-400">${subjectName}</span> | ${session.mode}
+                    </p>
+                </div>
+                <p class="text-lg font-bold tabular-nums text-indigo-300 ml-4 flex-shrink-0">${formatTime(session.duration, false)}</p>
+            </div>
+        `;
+    }).join('');
+    
+    window.createLucideIcons();
+}
 
         function updateDateSelector() {
             const uniqueDates = [...new Set(state.sessions.map(s => getFormattedDate(s.timestamp)))].sort().reverse();
@@ -2090,43 +2087,34 @@ function exportCsvData() {
             updateMusicButton();
         }
 
-       
-      // --- KEYBOARD SHORTCUTS ---
+        // KEYBOARD SHORTCUTS
+       // Global keyboard shortcuts
+      // Global keyboard shortcuts
+       // Global keyboard shortcuts
+        // Global keyboard shortcuts
+        // Global keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             
-            // --- CRITICAL FIX: Ignore Shortcuts When Typing ---
-            const element = e.target;
-            const tagName = element.tagName.toLowerCase();
-            
-            // Check if the focused element is a text entry field or content-editable
-            if (
-                tagName === 'input' ||
-                tagName === 'textarea' ||
-                tagName === 'select' ||
-                element.isContentEditable // Handles generic editable divs/elements
-            ) {
-                // Ignore the shortcut if the focused element is not disabled or read-only
-                if (!element.readOnly && !element.disabled) {
-                    return; 
-                }
-            }
-            // ----------------------------------------------------
-            
-            // Allow shortcuts only if a standard modifier key is NOT pressed
-            if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+            // --- Timer-Specific Shortcuts (Only on 'timer' page) ---
+            if (state.currentPage === 'timer') {
                 
-                // P or Spacebar: Play/Pause Timer
-                if (e.key.toLowerCase() === 'p' || e.key === ' ') {
+                // P: Start/Pause Session (Toggle)
+                if (e.key.toLowerCase() === 'p') {
                     e.preventDefault();
-                    playPauseTimer();
+                    // If running, pause. Otherwise, call startSession (which handles starting or unpausing).
+                    if (state.isRunning) {
+                        pauseSession();
+                    } else {
+                        startSession();
+                    }
                 }
-
-                // S: Stop Session (Requires timer is running)
-                if (e.key.toLowerCase() === 's' && state.isRunning) {
+                
+                // S: Stop Session (Requires any active state)
+                if (e.key.toLowerCase() === 's' && (state.isRunning || state.isPaused)) {
                     e.preventDefault();
                     stopSession();
                 }
-
+                
                 // D: Discard Session (Requires timer is NOT running AND there is time on the clock)
                 if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemainingTime() > 0) {
                     e.preventDefault();
@@ -2150,6 +2138,7 @@ function exportCsvData() {
                 }
             }
         });
+        // INITIALIZATION
 
        // INITIALIZATION
         document.addEventListener('DOMContentLoaded', () => {
