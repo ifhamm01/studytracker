@@ -2087,58 +2087,47 @@ function exportCsvData() {
             updateMusicButton();
         }
 
-        // KEYBOARD SHORTCUTS
-       // Global keyboard shortcuts
-      // Global keyboard shortcuts
-       // Global keyboard shortcuts
-        // Global keyboard shortcuts
-        // Global keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            
-            // --- Timer-Specific Shortcuts (Only on 'timer' page) ---
-            if (state.currentPage === 'timer') {
-                
-                // P: Start/Pause Session (Toggle)
-                if (e.key.toLowerCase() === 'p') {
-                    e.preventDefault();
-                    // If running, pause. Otherwise, call startSession (which handles starting or unpausing).
-                    if (state.isRunning) {
-                        pauseSession();
-                    } else {
-                        startSession();
-                    }
-                }
-                
-                // S: Stop Session (Requires any active state)
-                if (e.key.toLowerCase() === 's' && (state.isRunning || state.isPaused)) {
-                    e.preventDefault();
-                    stopSession();
-                }
-                
-                // D: Discard Session (Requires timer is NOT running AND there is time on the clock)
-                if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemainingTime() > 0) {
-                    e.preventDefault();
-                    discardSession();
-                }
+    // KEYBOARD SHORTCUTS
+document.addEventListener('keydown', (e) => {
+    // FIX: Use a more robust check to ensure keyboard shortcuts are disabled when an editable element is focused.
+    const isEditable = document.activeElement.matches('input, textarea, [contenteditable="true"]');
+    
+    if (!isEditable) {
+        // Space: Start/Pause
+        if (e.key === ' ') {
+            e.preventDefault();
+            startPauseHandler();
+        }
 
-                // F: Toggle Fullscreen
-                if (e.key.toLowerCase() === 'f') {
-                    e.preventDefault();
-                    toggleFullscreenClock();
-                }
-            }
-            
-            // --- Global Shortcuts ---
-            // Close Modal - Esc
-            if (e.key === 'Escape') {
-                if (!D.fullscreenClockModal.classList.contains('hidden')) {
-                    toggleFullscreenClock();
-                } else if (!D.detailsModal.classList.contains('hidden')) {
-                    closeModal();
-                }
-            }
-        });
-        // INITIALIZATION
+        // S: Stop Session (only if timer is running or paused with time > 0)
+        if (e.key.toLowerCase() === 's' && (state.isRunning || getRemainingTime() > 0)) {
+            e.preventDefault();
+            stopSession();
+        }
+
+        // D: Discard Session (only if paused with time > 0 or in pomodoro break)
+        if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemainingTime() > 0) {
+            e.preventDefault();
+            discardSession();
+        }
+
+        // F: Toggle Fullscreen
+        if (e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            toggleFullscreenClock();
+        }
+    }
+    
+    // --- Global Shortcuts ---
+    // Close Modal - Esc
+    if (e.key === 'Escape') {
+        if (!D.fullscreenClockModal.classList.contains('hidden')) {
+            toggleFullscreenClock();
+        } else if (!D.detailsModal.classList.contains('hidden')) {
+            closeModal();
+        }
+    }
+});
 
        // INITIALIZATION
         document.addEventListener('DOMContentLoaded', () => {
