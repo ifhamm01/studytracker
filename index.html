@@ -224,7 +224,7 @@
                     </div>
 
                     <div class="flex justify-center space-x-4 flex-wrap gap-2">
-                        <button id="start-pause-btn" onclick="startPauseHandler()" class="p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 bg-green-500 hover:bg-green-600">
+                        <button id="start-pause-btn" onclick="playPauseTimer()" class="p-4 rounded-full shadow-2xl transition-all transform hover:scale-105 active:scale-95 bg-green-500 hover:bg-green-600">
                             <i data-lucide="play" class="w-6 h-6"></i>
                         </button>
                         <button id="stop-btn" onclick="stopSession()" disabled class="p-4 rounded-full bg-red-600/70 hover:bg-red-600 shadow-2xl transition-all transform hover:scale-105 active:scale-95">
@@ -557,7 +557,7 @@
             presetFreeBtn: document.getElementById('preset-free-btn'),
             preset255Btn: document.getElementById('preset-25-5-btn'),
             preset5010Btn: document.getElementById('preset-50-10-btn'),
-            // End NEW
+            sessionGoalInput: document.getElementById('session-goal-input'),
             historyList: document.getElementById('history-list'),
             noHistory: document.getElementById('no-history'),
             subjectSelector: document.getElementById('subject-selector'),
@@ -829,36 +829,50 @@
     saveState();
 }
 
-        function startPauseHandler() {
-            if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
-                // Pomodoro ended, do not start/pause, wait for stopSession or next phase
-                return;
-            }
-
-            if (state.isRunning) {
-                // Pause Logic
-                state.isRunning = false;
-                if (intervalId) {
-                    clearInterval(intervalId);
-                    intervalId = null;
-                }
-                state.startTime = null; // Clear start time on pause
-
-            } else {
-                // Start Logic
-                state.isRunning = true;
-                state.startTime = Date.now();
-                intervalId = setInterval(tick, 1000);
-                
-                // Initialize a new session if starting from 0 timeElapsed
-                if (state.timeElapsed === 0 && !state.isPomodoroActive) {
-                    // Free mode session starts now.
-                }
-
-            }
-            updateUI();
-            saveState();
+     function playPauseTimer() {
+    // If the timer is NOT running, this block handles the START action.
+    if (!state.isRunning) {
+        
+        // --- ROBUST VALIDATION CHECK ---
+        let goalText = '';
+        
+        // 1. Check if the input element exists and get its trimmed value
+        if (D.sessionGoalInput) {
+            goalText = D.sessionGoalInput.value.trim();
+        } else {
+            // Failsafe: If the element is not found, we treat it as an error
+            showToast('Error: Goal input field not found.', 'error');
+            return;
         }
+
+        // 2. Check if the goal text is empty
+        if (goalText === '') {
+            showToast('Please enter a goal for your session before starting. 📝', 'error');
+            return; 
+        }
+        // ----------------------------------
+        
+        // If validation passes, save the current session details
+        state.currentSessionGoal = goalText;
+        state.currentSessionSubjectId = state.currentSubjectId;
+        state.currentSessionStartTime = Date.now();
+        
+        // Clear the goal input after saving the goal
+        D.sessionGoalInput.value = '';
+
+        // Start the timer
+        state.isRunning = true;
+        state.timerInterval = setInterval(onTick, 1000);
+        
+    } else {
+        // If the timer IS running, this block handles the PAUSE action.
+        state.isRunning = false;
+        clearInterval(state.timerInterval);
+    }
+    
+    updateUI();
+    saveState();
+}
 
         function tick() {
             if (!state.isRunning) return;
