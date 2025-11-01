@@ -492,6 +492,7 @@
             isRunning: false,
             timeElapsed: 0,
             startTime: null,
+            lastTickTime: null, // ADDED: Tracks the wall clock time for time correction
             subjects: DEFAULT_SUBJECTS,
             currentSubject: DEFAULT_SUBJECTS[0].id,
             sessionGoal: '',
@@ -677,7 +678,6 @@
                 date.setMonth(date.getMonth() - 1);
                 return date;
             }
-
             return new Date(0); // Epoch
         }
 
@@ -685,7 +685,8 @@
             const toast = document.createElement('div');
             toast.className = 'toast';
             if (type === 'error') toast.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-            toast.innerHTML = `<div class="flex items-center"><i data-lucide="${type === 'success' ? 'check-circle' : 'alert-triangle'}" class="w-5 h-5 mr-2"></i>${message}</div>`;
+            if (type === 'info') toast.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+            toast.innerHTML = `<div class="flex items-center"><i data-lucide="${type === 'success' ? 'check-circle' : (type === 'error' ? 'alert-triangle' : 'info')}" class="w-5 h-5 mr-2"></i>${message}</div>`;
             D.toastContainer.appendChild(toast);
             window.createLucideIcons();
             setTimeout(() => toast.remove(), 3000);
@@ -699,67 +700,89 @@
                     const loadedState = JSON.parse(storedState);
                     state = { ...DEFAULT_STATE, ...loadedState };
 
-                    // Handle time difference if timer was running when closed
+                    // Handle time difference if timer was running when app was closed
                     if (state.isRunning && state.startTime) {
-                        const timeSinceStart = (Date.now() - state.startTime) / 1000;
+                        const now = Date.now();
+                        const timeAway = Math.floor((now - state.startTime) / 1000);
+                        
                         if (state.isPomodoroActive) {
-                            state.pomodoroTimeRemaining = Math.max(0, state.pomodoroTimeRemaining - timeSinceStart);
+                            // Correct Pomodoro time
+                            state.pomodoroTimeRemaining = Math.max(0, state.pomodoroTimeRemaining - timeAway);
+
+                            if (state.pomodoroTimeRemaining <= 0) {
+                                // If the time is past the end of the session, stop it and log the max duration
+                                state.isRunning = false;
+                                if (state.pomodoroMode === 'focus') {
+                                    const maxDuration = PRESETS[state.timerMode].focus;
+                                    logSession(maxDuration);
+                                    // Manually transition to the next phase as if it just finished
+                                    nextPomodoroPhase(true); 
+                                } else if (state.pomodoroMode === 'break') {
+                                    // Just end the break
+                                    state.isPomodoroActive = false;
+                                    setTimerMode('free');
+                                }
+                                showToast('Session corrected: Pomodoro finished while you were away.', 'info');
+                            }
                         } else {
-                            state.timeElapsed += timeSinceStart;
+                            // Correct Free Mode time
+                            state.timeElapsed += timeAway;
                         }
                     }
+                    
+                    // Streak maintenance check
+                    checkStreakOnLoad();
+                } else {
+                    // Initial load: set pomodoro time
+                    setTimerMode(state.timerMode);
                 }
-            } catch (error) {
-                console.error("Error loading state:", error);
-                state = { ...DEFAULT_STATE };
-            }
 
-            // Ensure timerMode is set for legacy states and initialize pomodoroTimeRemaining
-            if (!state.timerMode || !PRESETS[state.timerMode]) {
-                state.timerMode = 'free';
+                calculateStats();
+            } catch (e) {
+                console.error("Could not load state:", e);
+                // Fallback to default state
+                state = DEFAULT_STATE;
+                setTimerMode(state.timerMode);
             }
-            if (state.pomodoroTimeRemaining === 0) {
-                // Set initial time to the focus time of the selected mode (or free if not active)
-                state.pomodoroTimeRemaining = state.isPomodoroActive ? (state.pomodoroMode === 'focus' ? PRESETS[state.timerMode].focus : PRESETS[state.timerMode].break) : PRESETS['free'].focus;
-            }
-            
-            // Streak check and reset
+        }
+        
+        function checkStreakOnLoad() {
             const now = new Date();
             const todayKey = getFormattedDate(now.toISOString());
+            const yesterday = new Date(now.getTime());
+            yesterday.setDate(now.getDate() - 1);
+            const yesterdayKey = getFormattedDate(yesterday.toISOString());
+            
             const lastActiveKey = state.lastActiveDate ? getFormattedDate(state.lastActiveDate) : null;
+            
+            // Check if goal was met yesterday (for streak continuity)
+            const goalMetYesterday = state.sessions.filter(s => getFormattedDate(s.timestamp) === yesterdayKey)
+                                                  .reduce((total, s) => total + s.duration, 0) >= (state.dailyFocusGoalMinutes * 60);
 
             if (lastActiveKey && lastActiveKey !== todayKey) {
-                const yesterday = new Date(now.getTime());
-                yesterday.setDate(now.getDate() - 1);
-                const yesterdayKey = getFormattedDate(yesterday.toISOString());
-                
-                // Check if yesterday's goal was met
-                const goalMetYesterday = state.sessions.filter(s => getFormattedDate(s.timestamp) === lastActiveKey)
-                    .reduce((total, s) => total + s.duration, 0) >= (state.dailyFocusGoalMinutes * 60);
-
-                // If last active was not yesterday, or if it was yesterday but goal wasn't met, reset the streak
+                // It is a new day
                 if (lastActiveKey !== yesterdayKey || !goalMetYesterday) {
                     // Check if goal met today, to prevent streak reset on first load of the day
                     const goalMetToday = state.sessions.filter(s => getFormattedDate(s.timestamp) === todayKey)
-                        .reduce((total, s) => total + s.duration, 0) >= (state.dailyFocusGoalMinutes * 60);
-                        
-                    if(!goalMetToday) {
+                                                        .reduce((total, s) => total + s.duration, 0) >= (state.dailyFocusGoalMinutes * 60);
+
+                    if(!goalMetToday) { 
                         state.currentDailyStreak = 0;
                         state.dailyTimeLogged = 0;
                     } else {
                         // If it's a new day and goal met today, but yesterday was missed, reset dailyTimeLogged
                         state.dailyTimeLogged = state.sessions.filter(s => getFormattedDate(s.timestamp) === todayKey)
-                            .reduce((total, s) => total + s.duration, 0);
+                                                .reduce((total, s) => total + s.duration, 0);
                     }
                 } else if (lastActiveKey === yesterdayKey && goalMetYesterday) {
                     // It is a new day (todayKey !== lastActiveKey) and goal met yesterday, so log today's time and potentially increment streak later
                     state.dailyTimeLogged = state.sessions.filter(s => getFormattedDate(s.timestamp) === todayKey)
-                        .reduce((total, s) => total + s.duration, 0);
+                                            .reduce((total, s) => total + s.duration, 0);
                 }
             } else if (lastActiveKey === todayKey) {
                 // Still on the same day, update dailyTimeLogged
                 state.dailyTimeLogged = state.sessions.filter(s => getFormattedDate(s.timestamp) === todayKey)
-                    .reduce((total, s) => total + s.duration, 0);
+                                        .reduce((total, s) => total + s.duration, 0);
             }
 
             state.lastActiveDate = now.toISOString();
@@ -772,182 +795,260 @@
                 // Ensure state.isRunning is false before saving if a pomodoro ended or free timer wasn't manually started
                 if (state.timerMode !== 'free' && state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
                     state.isRunning = false;
-                    state.startTime = null;
-                    if (intervalId) {
-                        clearInterval(intervalId);
-                        intervalId = null;
-                    }
                 }
-
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-            } catch (error) {
-                console.error("Error saving state:", error);
-                showToast('Failed to save data to local storage.', 'error');
+                
+                const stateToSave = { ...state };
+                // Do not save lastTickTime, it's a runtime variable
+                delete stateToSave.lastTickTime; 
+                
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+            } catch (e) {
+                console.error("Could not save state:", e);
             }
         }
-
-      // TIMER LOGIC
-function setTimerMode(mode) {
-    if (state.isRunning) {
-        showToast('Stop or pause the current session before changing the timer mode.', 'error');
-        return;
-    }
-    
-    state.timerMode = mode;
-    state.isPomodoroActive = (mode !== 'free');
-    
-    // Reset state for new mode
-    state.pomodoroMode = 'focus';
-    state.pomodoroTimeRemaining = PRESETS[mode].focus;
-    state.timeElapsed = 0;
-    
-    // --- FIX: Initialize Background Timing State ---
-    
-    // Clear any previous timing context
-    state.pauseTime = 0; 
-    state.wasPaused = false;
-    
-    if (state.isPomodoroActive) {
-        // When setting a Pomodoro/Break mode, we initialize the startTime
-        // as if the timer had just started 'now' with 0 elapsed time.
-        // This is necessary because the tick() function now relies on startTime.
-        state.startTime = Date.now();
-    } else {
-        // For Free Mode, we want the count-up to start from when the user presses 'Start'
-        // but we still clear the previous startTime context.
-        state.startTime = 0; // Will be set to Date.now() when startPauseHandler is called
-    }
-    
-    // ---------------------------------------------
-    
-    // UI updates
-    updateUI();
-    
-    // --- FIX: Update Preset button styles and ensure color is applied ---
-    const btns = [D.presetFreeBtn, D.preset255Btn, D.preset5010Btn];
-    
-    btns.forEach(btn => {
-        let btnMode = btn.id.replace('preset-', '').replace('-btn', '');
         
-        // **CRITICAL FIX:** Normalize the btnMode string to match the 'mode' variable (e.g., '25-5' -> '25/5')
-        btnMode = btnMode.replace(/-/g, '/'); 
+        // TIMER LOGIC
         
-        if (btnMode === mode) {
-            // Apply active styles (Indigo color)
-            btn.classList.add('bg-indigo-600/70', 'hover:bg-indigo-600');
-            btn.classList.remove('bg-gray-700/50', 'hover:bg-gray-600/70');
-            btn.classList.add('text-white'); 
-        } else {
-            // Apply inactive styles (Gray color)
-            btn.classList.remove('bg-indigo-600/70', 'hover:bg-indigo-600', 'text-white');
-            btn.classList.add('bg-gray-700/50', 'hover:bg-gray-600/70');
-        }
-    });
-    saveState();
-}
-
-        function startPauseHandler() {
-    if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
-        // Pomodoro ended, do not start/pause, wait for stopSession or next phase
-        return;
-    }
-
-    if (state.isRunning) {
-        // --- PAUSE LOGIC ---
-        state.isRunning = false;
-        if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-        }
-        
-        // FIX: Track the exact system time when paused
-        state.pauseTime = Date.now(); 
-        state.wasPaused = true; // Assuming you have this state property
-
-    } else {
-        // --- START/RESUME LOGIC ---
-        state.isRunning = true;
-
-        // If resuming (wasPaused is true):
-        if (state.wasPaused) {
-            const timeElapsedDuringPause = Date.now() - state.pauseTime;
-            // Shift the original startTime forward by the length of the pause
-            state.startTime += timeElapsedDuringPause; 
-            state.wasPaused = false;
-        } 
-        // If starting a brand new session:
-        else if (state.timeElapsed === 0 && !state.isPomodoroActive) {
-            // Set the start time. This is only reliable for Free Mode (timeElapsed=0).
-            state.startTime = Date.now();
-        }
-
-        intervalId = setInterval(tick, 1000);
-        
-        // Removed the 'Initialize a new session' logic as it's cleaner to handle 
-        // the initial setup elsewhere or assume state is ready here.
-    }
-    
-    updateUI();
-    saveState();
-}
-
-        function tick() {
-            if (!state.isRunning) return;
-
-            // Free Mode
-            if (!state.isPomodoroActive) {
-                state.timeElapsed++;
-                state.totalFocusTime++;
-                state.dailyTimeLogged++;
-            } 
-            // Pomodoro Mode
-            else {
-                state.pomodoroTimeRemaining--;
-
-                if (state.pomodoroMode === 'focus') {
-                    state.timeElapsed++;
-                    state.totalFocusTime++;
-                    state.dailyTimeLogged++;
-                }
-
-                if (state.pomodoroTimeRemaining <= 0) {
-                    // Auto-pause and handle phase transition
-                    state.isRunning = false;
+        // REPLACED: Updated updateTimer using the Wall Clock method
+        function updateTimer() {
+            if (!state.isRunning) {
+                if (intervalId) {
                     clearInterval(intervalId);
                     intervalId = null;
-                    state.startTime = null;
+                }
+                return;
+            }
 
-                    if (state.pomodoroMode === 'focus') {
-                        // End Focus, start break
-                        const focusDuration = PRESETS[state.timerMode].focus;
-                        // Log the completed focus session
-                        logSession(focusDuration); 
+            const now = Date.now();
+            if (!state.lastTickTime) {
+                state.lastTickTime = now;
+                return; // Wait for the next tick for calculation
+            }
+            
+            // Calculate actual time passed in milliseconds and convert to seconds
+            // Use Math.floor to ensure we only count full seconds elapsed.
+            const timePassedMs = now - state.lastTickTime;
+            let timePassedSeconds = Math.floor(timePassedMs / 1000); 
 
-                        // Check if a break is needed (50/10 mode has a break)
-                        if (PRESETS[state.timerMode].break > 0) {
-                            state.pomodoroMode = 'break';
-                            state.pomodoroTimeRemaining = PRESETS[state.timerMode].break;
-                            showToast(`Focus complete! Time for a ${formatMinutes(state.pomodoroTimeRemaining)} break.`, 'success');
-                        } else {
-                             // No break, simply stop (e.g., if using a custom Pomodoro mode without a break)
-                            state.isPomodoroActive = false;
-                            setTimerMode('free'); // Revert to free mode
-                            showToast(`Focus complete! Session logged.`, 'success');
-                        }
+            if (timePassedSeconds <= 0) {
+                // If less than a second passed, adjust lastTickTime and exit
+                state.lastTickTime = now;
+                updateUI(); 
+                return; 
+            }
+            
+            // Update the wall clock time for the next tick
+            state.lastTickTime = now; 
+            
+            // ------------------------------------------------------------------
+            // Core Timer Logic
+            // ------------------------------------------------------------------
+            let phaseChanged = false;
 
-                    } else if (state.pomodoroMode === 'break') {
-                        // End Break, go back to Focus
-                        state.pomodoroMode = 'focus';
-                        state.pomodoroTimeRemaining = PRESETS[state.timerMode].focus;
-                        showToast(`Break over! Time to focus again.`, 'success');
-                    }
+            if (state.isPomodoroActive) {
+                // POMODORO MODE: Count down the remaining time
+                state.pomodoroTimeRemaining = Math.max(0, state.pomodoroTimeRemaining - timePassedSeconds);
+
+                if (state.pomodoroTimeRemaining <= 0) {
+                    // Pomodoro phase finished
+                    nextPomodoroPhase(); 
+                    phaseChanged = true;
+                    // nextPomodoroPhase handles updateUI/saveState/checkAchievements
+                }
+            } else {
+                // FREE MODE: Count up the elapsed time
+                state.timeElapsed += timePassedSeconds;
+            }
+
+            if (!phaseChanged) {
+                updateUI();
+                saveState();
+                checkAchievements();
+            }
+        }
+        // END REPLACED: updateTimer
+
+        function getRemainingTime() {
+            return state.isPomodoroActive ? state.pomodoroTimeRemaining : state.timeElapsed;
+        }
+
+        function setTimerMode(mode) {
+            if (state.isRunning) {
+                showToast('Cannot change mode while timer is running. Please stop first.', 'error');
+                return;
+            }
+            
+            const preset = PRESETS[mode];
+            state.timerMode = mode;
+            state.isPomodoroActive = (mode !== 'free');
+            state.pomodoroMode = 'focus';
+            state.timeElapsed = 0;
+            state.pomodoroTimeRemaining = preset.focus;
+            state.startTime = null; // We still clear the previous startTime context.
+            
+            // UI updates
+            updateUI();
+            
+            // --- FIX: Update Preset button styles and ensure color is applied ---
+            const btns = [D.presetFreeBtn, D.preset255Btn, D.preset5010Btn];
+            btns.forEach(btn => {
+                let btnMode = btn.id.replace('preset-', '').replace('-btn', '');
+                // **CRITICAL FIX:** Normalize the btnMode string to match the 'mode' variable (e.g., '25-5' -> '25/5')
+                btnMode = btnMode.replace(/-/g, '/');
+                
+                if (btnMode === mode) {
+                    // Apply active styles (Indigo color)
+                    btn.classList.add('bg-indigo-600/70', 'hover:bg-indigo-600');
+                    btn.classList.remove('bg-gray-700/50', 'hover:bg-gray-600/70');
+                    btn.classList.add('text-white');
+                } else {
+                    // Apply inactive styles (Gray color)
+                    btn.classList.remove('bg-indigo-600/70', 'hover:bg-indigo-600', 'text-white');
+                    btn.classList.add('bg-gray-700/50', 'hover:bg-gray-600/70');
+                }
+            });
+
+            saveState();
+        }
+
+        // UPDATED: startPauseHandler to set lastTickTime
+        function startPauseHandler() {
+            if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
+                // Pomodoro ended, do not start/pause, wait for stopSession or next phase
+                return;
+            }
+            if (state.isRunning) {
+                // --- PAUSE LOGIC ---
+                state.isRunning = false;
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+                state.lastTickTime = null; // Clear wall clock reference on pause
+            } else {
+                // --- START LOGIC ---
+                if (!state.currentSubject) {
+                    showToast('Please select a subject before starting the timer.', 'error');
+                    return;
+                }
+
+                state.isRunning = true;
+                state.startTime = Date.now();
+                state.lastTickTime = Date.now(); // ADDED: Set wall clock time on start/resume
+
+                if (state.pomodoroTimeRemaining > 0) {
+                    // Pomodoro Start or Resume
+                    intervalId = setInterval(updateTimer, 1000);
+                } else if (!state.isPomodoroActive) {
+                    // Free Mode Start
+                    intervalId = setInterval(updateTimer, 1000);
+                } else {
+                    // If pomodoro is active but time is 0 (should only happen after logging), re-init it
+                    setTimerMode(state.timerMode);
+                    startPauseHandler();
+                    return;
                 }
             }
 
             updateUI();
             saveState();
         }
+        // END UPDATED: startPauseHandler
+
+
+        function stopSession() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            state.isRunning = false;
+            state.lastTickTime = null; // Clear wall clock reference on stop
+
+            const focusTime = state.isPomodoroActive 
+                ? (PRESETS[state.timerMode].focus - state.pomodoroTimeRemaining)
+                : state.timeElapsed;
+
+            // Only log if it was a Pomodoro focus time OR Free mode time > 5 seconds
+            if (focusTime > 5 || (state.isPomodoroActive && state.pomodoroMode === 'focus')) {
+                logSession(focusTime);
+                state.dailyTimeLogged += focusTime;
+                checkDailyStreak(); // Check streak after logging session time
+            } else if (focusTime > 0) {
+                showToast(`Session too short (${formatMinutes(focusTime)}) to log.`, 'error');
+            }
+
+            // Reset state after logging
+            if (state.isPomodoroActive && state.pomodoroTimeRemaining <= 0) {
+                 // If the timer ended naturally (pomodoro finished), nextPomodoroPhase handles the new session start/break.
+            } else {
+                // If stopped manually, reset to the beginning of the focus session/free mode.
+                setTimerMode(state.timerMode);
+            }
+            
+            calculateStats();
+            updateUI();
+            saveState();
+        }
         
+        function discardSession() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            state.isRunning = false;
+            state.lastTickTime = null; // Clear wall clock reference on discard
+            setTimerMode(state.timerMode);
+            showToast('Session discarded. Time not logged.', 'info');
+            updateUI();
+            saveState();
+        }
+
+        function nextPomodoroPhase(isCorrection = false) {
+            // Log the completed Focus Session only if the phase was 'focus' and it wasn't a manual stop
+            if (state.pomodoroMode === 'focus' && !isCorrection) {
+                // Duration is the full focus time, as it ran to zero
+                const focusDuration = PRESETS[state.timerMode].focus;
+                logSession(focusDuration);
+                state.dailyTimeLogged += focusDuration;
+                checkDailyStreak(); // Check streak after logging
+                calculateStats();
+            }
+
+            // Only switch phase if the new time is > 0 (i.e., there is a break)
+            if (state.pomodoroMode === 'focus') {
+                // Logged focus time, now check if a break is needed (50/10 mode has a break)
+                if (PRESETS[state.timerMode].break > 0) {
+                    state.pomodoroMode = 'break';
+                    state.pomodoroTimeRemaining = PRESETS[state.timerMode].break;
+                    showToast(`Focus complete! Time for a ${formatMinutes(state.pomodoroTimeRemaining)} break.`, 'success');
+                } else {
+                    // No break, simply stop (e.g., if using a custom Pomodoro mode without a break)
+                    state.isPomodoroActive = false;
+                    setTimerMode('free'); // Revert to free mode
+                    showToast(`Focus complete! Session logged.`, 'success');
+                }
+            } else if (state.pomodoroMode === 'break') {
+                // End Break, go back to Focus
+                state.pomodoroMode = 'focus';
+                state.pomodoroTimeRemaining = PRESETS[state.timerMode].focus;
+                showToast(`Break over! Time to focus again.`, 'success');
+            }
+            
+            // Re-start the timer for the break/next focus session
+            if (!isCorrection && state.isRunning) {
+                state.lastTickTime = Date.now();
+            } else if (!isCorrection && !state.isRunning) {
+                // If it ended while paused, just update UI and wait for user to hit start
+            } else if (isCorrection) {
+                // If corrected after tab reactivation, the timer interval needs to be running
+                if (intervalId) clearInterval(intervalId);
+                intervalId = setInterval(updateTimer, 1000);
+            }
+
+            updateUI();
+            saveState();
+        }
+
         function logSession(durationOverride = state.timeElapsed) {
             const now = new Date();
             const session = {
@@ -963,7 +1064,7 @@ function setTimerMode(mode) {
             if (session.duration > 5) {
                 state.sessions.unshift(session);
                 showToast(`Session logged: ${formatMinutes(session.duration)} of focused time!`, 'success');
-
+                
                 // Update tasks: create an associated completed task
                 if (D.taskInput.value.trim()) {
                     const task = {
@@ -971,106 +1072,95 @@ function setTimerMode(mode) {
                         text: `[Focus Session] ${D.taskInput.value.trim()} (${formatMinutes(session.duration)})`,
                         completed: true,
                         priority: 'low',
-                        dueDate: now.toISOString().split('T')[0],
-                        completionDate: now.toISOString(),
+                        timestamp: session.timestamp,
+                        dueDate: null,
                     };
                     state.tasks.unshift(task);
                 }
             }
-            
-            // Recalculate stats for achievement and streak checks
-            calculateStats();
-            checkAchievements();
-            checkDailyStreak();
-            
-            // Reset for a new session
-            state.timeElapsed = 0;
-            D.taskInput.value = '';
-            
-            saveState();
-            renderHistory();
         }
 
-        function stopSession() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            state.isRunning = false;
-            state.startTime = null;
-
-            logSession(state.isPomodoroActive ? PRESETS[state.timerMode].focus : state.timeElapsed);
-
-            // Pomodoro mode specific reset: ensure pomodoroTimeRemaining is reset to focus time of current mode
-            if (state.isPomodoroActive) {
-                state.pomodoroMode = 'focus';
-                state.pomodoroTimeRemaining = PRESETS[state.timerMode].focus;
-            } else {
-                state.pomodoroTimeRemaining = PRESETS['free'].focus;
-            }
-
-            updateUI();
-        }
-
-        function discardSession() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            state.isRunning = false;
-            state.startTime = null;
-            state.timeElapsed = 0;
-            D.taskInput.value = '';
-
-            // Pomodoro mode specific reset
-            if (state.isPomodoroActive) {
-                state.pomodoroMode = 'focus';
-                state.pomodoroTimeRemaining = PRESETS[state.timerMode].focus;
-            } else {
-                state.pomodoroTimeRemaining = PRESETS['free'].focus;
-            }
+        function checkDailyStreak() {
+            const goalSeconds = state.dailyFocusGoalMinutes * 60;
+            const now = new Date();
+            const todayKey = getFormattedDate(now.toISOString());
+            const yesterday = new Date(now.getTime());
+            yesterday.setDate(now.getDate() - 1);
+            const yesterdayKey = getFormattedDate(yesterday.toISOString());
             
-            showToast('Session discarded.', 'error');
-            updateUI();
+            const lastActiveKey = state.lastActiveDate ? getFormattedDate(state.lastActiveDate) : null;
+            
+            const goalMetToday = state.dailyTimeLogged >= goalSeconds;
+
+            if (goalMetToday && lastActiveKey !== todayKey) {
+                // Check if the streak was active yesterday or if it's the very first session
+                if (state.currentDailyStreak > 0) {
+                    // Check if yesterday's goal was met to determine if we continue or reset
+                    const goalMetYesterday = state.sessions.filter(s => getFormattedDate(s.timestamp) === yesterdayKey)
+                                                        .reduce((total, s) => total + s.duration, 0) >= goalSeconds;
+                    
+                    if (goalMetYesterday) {
+                        state.currentDailyStreak += 1;
+                        showToast(`🔥 Streak continued! Now ${state.currentDailyStreak} days!`, 'success');
+                    } else {
+                        // Missed a day
+                        state.currentDailyStreak = 1;
+                        showToast(`Streak reset, but a new streak has begun!`, 'info');
+                    }
+                } else {
+                    // First day of streak
+                    state.currentDailyStreak = 1;
+                    showToast(`🔥 First day of your focus streak!`, 'success');
+                }
+            } else if (lastActiveKey !== todayKey) {
+                // New day, but goal not met today (yet) and if yesterday's goal wasn't met, reset streak
+                const goalMetYesterday = state.sessions.filter(s => getFormattedDate(s.timestamp) === yesterdayKey)
+                                                        .reduce((total, s) => total + s.duration, 0) >= goalSeconds;
+                if (!goalMetYesterday) {
+                    state.currentDailyStreak = 0;
+                }
+            }
+
+            state.longestDailyStreak = Math.max(state.longestDailyStreak, state.currentDailyStreak);
+            state.lastActiveDate = now.toISOString();
             saveState();
         }
+
+        // AUTO-CLEANUP
         function filterExpiredTasks() {
-    // Get today's date as a string (YYYY-MM-DD) for accurate comparison
-    const today = new Date().toISOString().split('T')[0]; 
-    let tasksChanged = false;
+            const today = getFormattedDate(new Date().toISOString());
+            let tasksChanged = false;
 
-    // Filter the state.tasks array
-    const activeTasks = state.tasks.filter(task => {
-        
-        // 1. Completed tasks are always kept (for history/metrics).
-        if (task.completed) {
-            return true;
+            // Filter the state.tasks array
+            const activeTasks = state.tasks.filter(task => {
+                // 1. Completed tasks are always kept (for history/metrics).
+                if (task.completed) {
+                    return true;
+                }
+                // 2. Tasks without a dueDate are kept (they have no deadline).
+                if (!task.dueDate) {
+                    return true;
+                }
+                // 3. If the dueDate is today or in the future, we keep it.
+                // String comparison works correctly for YYYY-MM-DD format.
+                if (task.dueDate >= today) {
+                    return true; // Keep the task
+                }
+                // 4. If none of the above, the task is UNCOMPLETED and PAST DUE.
+                tasksChanged = true;
+                return false; // Remove the expired task
+            });
+
+            // Only update and save state if tasks were actually removed
+            if (tasksChanged) {
+                state.tasks = activeTasks;
+                saveState();
+                showToast('Expired tasks have been automatically cleared from the list. ✅', 'info');
+            }
         }
 
-        // 2. Tasks without a dueDate are kept (they have no deadline).
-        if (!task.dueDate) {
-            return true;
-        }
-
-        // 3. If the dueDate is today or in the future, we keep it.
-        // String comparison works correctly for YYYY-MM-DD format.
-        if (task.dueDate >= today) {
-            return true; // Keep the task
-        }
-
-        // 4. If none of the above, the task is UNCOMPLETED and PAST DUE.
-        tasksChanged = true;
-        return false; // Remove the expired task
-    });
-
-    // Only update and save state if tasks were actually removed
-    if (tasksChanged) {
-        state.tasks = activeTasks;
-        saveState();
-        showToast('Expired tasks have been automatically cleared from the list. ✅', 'info');
-    }
-}
         // UI UPDATES
+        // UPDATED: updateUI to use totalFocusTimeToday for streak
         function updateUI() {
             const timeToDisplay = state.isPomodoroActive ? state.pomodoroTimeRemaining : state.timeElapsed;
             D.timeDisplay.textContent = formatTime(timeToDisplay, true);
@@ -1090,54 +1180,61 @@ function setTimerMode(mode) {
             if (state.isPomodoroActive) {
                 D.stopBtn.disabled = !state.isRunning || state.pomodoroMode === 'break';
                 D.discardBtn.disabled = !state.isRunning || state.pomodoroMode === 'break';
+                D.startPauseBtn.innerHTML = `<i data-lucide="${state.isRunning ? 'pause' : 'play'}" class="w-6 h-6"></i>`;
+                // Pomodoro only allows pausing, not stopping or discarding, if it's a break
+                if (state.pomodoroMode === 'break') {
+                    D.startPauseBtn.innerHTML = `<i data-lucide="${state.isRunning ? 'pause' : 'play'}" class="w-6 h-6 text-yellow-400"></i>`;
+                    D.stopBtn.disabled = true;
+                    D.discardBtn.disabled = true;
+                }
+
             } else {
                 const hasTimeElapsed = state.timeElapsed > 0;
                 D.stopBtn.disabled = !state.isRunning && !hasTimeElapsed;
                 D.discardBtn.disabled = !state.isRunning && !hasTimeElapsed;
+                D.startPauseBtn.innerHTML = `<i data-lucide="${state.isRunning ? 'pause' : 'play'}" class="w-6 h-6"></i>`;
             }
 
-            // === FIX: Robust Play/Pause Button Icon Update (Handles Lucide Icon replacement) ===
-            const btn = D.startPauseBtn;
-            let iconName = state.isRunning ? 'pause' : 'play';
-
-            // 1. Update button color classes
-            if (state.isRunning) {
-                btn.classList.remove('bg-green-500', 'hover:bg-green-600');
-                btn.classList.add('bg-indigo-500', 'hover:bg-indigo-600');
-            } else {
-                btn.classList.remove('bg-indigo-500', 'hover:bg-indigo-600');
-                btn.classList.add('bg-green-500', 'hover:bg-green-600');
-            }
-
-            // 2. Remove all children (This removes the old rendered <svg> icon)
-            while (btn.firstChild) {
-                btn.removeChild(btn.firstChild);
-            }
-
-            // 3. Create a new <i> placeholder with the correct data-lucide attribute
-            const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', iconName);
-            newIcon.className = 'w-6 h-6'; // Re-add the necessary size classes
-
-            // 4. Append the new icon to the button
-            btn.appendChild(newIcon);
-
-            // 5. Re-render the icon (This replaces the new <i> with the correct <svg> icon)
-            window.createLucideIcons();
-            // === END FIX ===
+            // Music button icon
+            const musicIcon = D.musicPlayer.paused ? 'music' : 'volume-2';
             
+            // FIX: Add null check for the icon element to prevent TypeError (index.html:1200)
+            const musicIconElement = D.musicBtn.querySelector('i');
+            if (musicIconElement) {
+                musicIconElement.setAttribute('data-lucide', musicIcon);
+            }
+            // END FIX
+            
+            window.createLucideIcons(); // To update the music button icon
+
             // Task input state
             D.taskInput.disabled = state.isRunning;
-            
+
+
             // Streak Progress Bar
+            // Calculate Total Focus Time Today (Completed Sessions + Current Running Session)
+            let currentSessionTime = 0;
+            if (state.isRunning) {
+                if (state.isPomodoroActive && state.pomodoroMode === 'focus') {
+                    // For Pomodoro Focus mode, time is calculated by: Total Focus Time - Time Remaining
+                    currentSessionTime = PRESETS[state.timerMode].focus - state.pomodoroTimeRemaining;
+                } else if (!state.isPomodoroActive) {
+                    // For Free Mode, time is simply the time elapsed
+                    currentSessionTime = state.timeElapsed;
+                }
+            }
+            
+            // This is the total time for the streak check
+            const totalFocusTimeToday = state.dailyTimeLogged + currentSessionTime;
+            
             const goalSeconds = state.dailyFocusGoalMinutes * 60;
-            const progress = Math.min(1, state.dailyTimeLogged / goalSeconds);
+            const progress = Math.min(1, totalFocusTimeToday / goalSeconds); // Use totalFocusTimeToday
             const offset = CIRCLE_CIRCUMFERENCE * (1 - progress);
             D.streakProgressBar.style.strokeDashoffset = offset;
             D.streakProgressPercent.textContent = `${Math.floor(progress * 100)}%`;
             D.streakCount.textContent = state.currentDailyStreak;
-            
-            const remainingMinutes = Math.max(0, state.dailyFocusGoalMinutes - Math.floor(state.dailyTimeLogged / 60));
+
+            const remainingMinutes = Math.max(0, state.dailyFocusGoalMinutes - Math.floor(totalFocusTimeToday / 60)); // Use totalFocusTimeToday
             if (remainingMinutes > 0) {
                 D.nextStreakInfo.textContent = `Log ${remainingMinutes} more minutes to secure your streak!`;
                 D.nextStreakInfo.classList.remove('text-emerald-400');
@@ -1151,19 +1248,20 @@ function setTimerMode(mode) {
             // Fullscreen clock info
             const currentSubject = state.subjects.find(s => s.id === state.currentSubject);
             D.fullscreenSubjectGoal.textContent = `${currentSubject ? currentSubject.name : 'Subject'} | ${D.taskInput.value.trim() || 'No Goal'}`;
+
             renderHistory('', '', 5);
             window.createLucideIcons();
         }
+        // END UPDATED: updateUI
 
         // SUBJECTS
         function renderSubjectSelector() {
             D.subjectSelector.innerHTML = state.subjects.map(subject => {
                 const isChecked = subject.id === state.currentSubject;
                 const activeClasses = isChecked ? `bg-${subject.color}-600 border-${subject.color}-400 text-white shadow-lg shadow-${subject.color}-600/50` : `bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-600/70`;
-
                 return `
                     <input type="radio" id="subject-${subject.id}" name="subject-select" value="${subject.id}" class="hidden subject-radio" ${isChecked ? 'checked' : ''} onclick="selectSubject('${subject.id}')">
-                    <label for="subject-${subject.id}" class="p-2 px-4 rounded-full text-sm font-medium border cursor-pointer transition-all duration-200 transform hover:scale-[1.02] ${activeClasses}">
+                    <label for="subject-${subject.id}" class="p-3 rounded-lg font-semibold transition-all cursor-pointer border ${activeClasses}">
                         ${subject.name}
                     </label>
                 `;
@@ -1173,54 +1271,49 @@ function setTimerMode(mode) {
         function selectSubject(subjectId) {
             state.currentSubject = subjectId;
             saveState();
-            updateUI(); // Needed to potentially update the fullscreen clock info
             renderSubjectSelector();
+            updateUI(); // To update fullscreen subject info
         }
 
-        function renderSubjectManager() {
-            D.subjectsListManager.innerHTML = state.subjects.map(subject => {
-                return `
-                    <div class="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                        <span class="text-gray-300 font-medium" style="color: var(--tw-color-${subject.color}-400, #a8a29e);">
-                            <i data-lucide="square" class="w-4 h-4 inline mr-2 text-${subject.color}-400"></i>
-                            ${subject.name}
-                        </span>
-                        <button onclick="removeSubject('${subject.id}')" class="p-1 rounded-full text-red-400 hover:bg-white/10 transition-colors">
-                            <i data-lucide="x" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                `;
-            }).join('');
-            window.createLucideIcons();
-        }
-        
         function addSubjectHandler() {
             const name = D.newSubjectInput.value.trim();
             if (!name) {
                 showToast('Subject name cannot be empty.', 'error');
                 return;
             }
-
-            const subjectId = name.toLowerCase().replace(/\s/g, '_');
-            if (state.subjects.some(s => s.id === subjectId)) {
+            if (state.subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
                 showToast('Subject already exists.', 'error');
                 return;
             }
 
-            // Assign next available color, cycling through the list
-            const nextColorIndex = state.subjects.length % SUBJECT_COLORS.length;
             const newSubject = {
-                id: subjectId,
+                id: name.toLowerCase().replace(/\s/g, '_'),
                 name: name,
-                color: SUBJECT_COLORS[nextColorIndex]
+                // Cycle through colors
+                color: SUBJECT_COLORS[state.subjects.length % SUBJECT_COLORS.length]
             };
-            
+
             state.subjects.push(newSubject);
             D.newSubjectInput.value = '';
-            showToast(`Subject "${name}" added!`, 'success');
+            showToast('Subject added successfully!', 'success');
             saveState();
             renderSubjectSelector();
             renderSubjectManager();
+            calculateStats();
+        }
+
+        function renderSubjectManager() {
+            D.subjectsListManager.innerHTML = state.subjects.map(subject => {
+                return `
+                    <div class="flex items-center p-3 bg-gray-700/50 rounded-lg justify-between">
+                        <span class="text-gray-300 border-l-4 border-${subject.color}-500 pl-3">${subject.name}</span>
+                        <button onclick="removeSubject('${subject.id}')" class="p-1 rounded-full text-red-400 hover:bg-white/10 transition-colors">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            window.createLucideIcons();
         }
 
         function removeSubject(subjectId) {
@@ -1228,19 +1321,16 @@ function setTimerMode(mode) {
                 showToast('Cannot remove the last subject.', 'error');
                 return;
             }
-            
-            if (subjectId === state.currentSubject) {
-                state.currentSubject = state.subjects.filter(s => s.id !== subjectId)[0].id;
+            if (state.currentSubject === subjectId) {
+                state.currentSubject = state.subjects.find(s => s.id !== subjectId).id;
             }
-            
             state.subjects = state.subjects.filter(s => s.id !== subjectId);
-            
             showToast('Subject removed.', 'success');
             saveState();
             renderSubjectSelector();
             renderSubjectManager();
         }
-        
+
         // TASKS
         function renderTasks() {
             if (state.tasks.length === 0) {
@@ -1249,20 +1339,18 @@ function setTimerMode(mode) {
                 return;
             }
             D.noTasks.classList.add('hidden');
-            
+
             // Sort: Incomplete tasks first, then by priority (high > medium > low), then by due date
             const sortedTasks = [...state.tasks].sort((a, b) => {
                 // 1. Completion status (incomplete first)
                 if (a.completed !== b.completed) {
                     return a.completed ? 1 : -1;
                 }
-                
                 // 2. Priority
                 const priorityOrder = { high: 1, medium: 2, low: 3 };
                 if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
                     return priorityOrder[a.priority] - priorityOrder[b.priority];
                 }
-                
                 // 3. Due Date (earliest first)
                 return (a.dueDate || '9999-12-31').localeCompare(b.dueDate || '9999-12-31');
             });
@@ -1280,24 +1368,25 @@ function setTimerMode(mode) {
                         <div class="flex-grow ml-3">
                             <p class="text-sm font-medium text-gray-100">${task.text}</p>
                             <p class="text-xs text-gray-400 mt-1">${dateDisplay} | Priority: <span class="capitalize">${task.priority}</span></p>
-                            ${task.completed ? `<p class="text-xs text-emerald-400 mt-1">Completed: ${formatDateForDisplay(getFormattedDate(task.completionDate))}</p>` : ''}
+                            ${task.completed ? `<p class="text-xs text-emerald-400 mt-1">Completed: ${formatDateForDisplay(getFormattedDate(task.timestamp))}</p>` : ''}
                         </div>
-                        <button onclick="removeTask('${task.id}')" class="ml-4 p-1 rounded-full text-red-400 hover:bg-red-400/20 transition-colors flex-shrink-0" title="Delete Task">
-                            <i data-lucide="trash-2" class="w-5 h-5"></i>
-                        </button>
+                        <div class="flex flex-col ml-3 space-y-2 flex-shrink-0">
+                            <button onclick="deleteTask('${task.id}')" title="Delete Task" class="p-1 rounded-full text-red-400 hover:bg-white/10 transition-colors">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
-            
             window.createLucideIcons();
         }
 
         function addTask() {
             const text = D.taskInputNew.value.trim();
             const priority = D.taskPriority.value;
-            const dueDate = D.taskDueDate.value || null;
+            const dueDate = D.taskDueDate.value;
 
-            if (!text) {
+            if (text === '') {
                 showToast('Task description cannot be empty.', 'error');
                 return;
             }
@@ -1307,117 +1396,185 @@ function setTimerMode(mode) {
                 text: text,
                 completed: false,
                 priority: priority,
-                dueDate: dueDate,
-                completionDate: null,
+                dueDate: dueDate || null,
+                timestamp: new Date().toISOString(),
             };
 
-            state.tasks.unshift(newTask);
+            state.tasks.unshift(newTask); // Add to the start
             D.taskInputNew.value = '';
             D.taskDueDate.value = '';
-            
-            showToast('Task added successfully!', 'success');
+            D.taskPriority.value = 'medium';
+            showToast('Task added!', 'success');
             saveState();
-            calculateStats();
             renderTasks();
+            calculateStats();
         }
-        
+
         function toggleTaskCompletion(taskId) {
             const task = state.tasks.find(t => t.id === taskId);
             if (task) {
                 task.completed = !task.completed;
-                task.completionDate = task.completed ? new Date().toISOString() : null;
-                
                 if (task.completed) {
-                    showToast('Task marked complete!', 'success');
-                    checkAchievements();
+                    showToast('Task completed! 🎉', 'success');
                 } else {
-                    showToast('Task marked incomplete.', 'error');
+                    showToast('Task marked incomplete.', 'info');
                 }
-                
                 saveState();
-                calculateStats();
                 renderTasks();
+                calculateStats();
+                checkAchievements();
             }
         }
-        
-        function removeTask(taskId) {
+
+        function deleteTask(taskId) {
             state.tasks = state.tasks.filter(t => t.id !== taskId);
-            showToast('Task deleted.', 'error');
+            showToast('Task deleted.', 'success');
             saveState();
-            calculateStats();
             renderTasks();
+            calculateStats();
         }
 
-        // NAVIGATION & MODALS
-        function switchPage(page) {
-            const views = {
-                'timer': D.timerView,
-                'tasks': D.tasksView,
-                'history': D.historyView,
-                'achievements': D.achievementsView,
-                'progress': D.progressView,
-                'settings': D.settingsView
-            };
-            
-            const navButtons = {
-                'timer': D.navTimerBtn,
-                'tasks': D.navTasksBtn,
-                'history': D.navHistoryBtn,
-                'achievements': D.navAchievementsBtn,
-                'progress': D.navProgressBtn,
-                'settings': D.navSettingsBtn
-            };
+        // HISTORY/DETAILS MODAL
+        function renderHistory(searchQuery = '', dateKey = '', limit = Infinity) {
+            const allSessions = [...state.sessions];
 
-            // Hide all views
-            Object.values(views).forEach(view => view.classList.add('hidden'));
-
-            // Show selected view
-            const selectedView = views[page];
-            if (selectedView) {
-                selectedView.classList.remove('hidden');
-                state.currentPage = page;
-            }
-            
-            // Update navigation button styles
-            Object.values(navButtons).forEach(btn => {
-                btn.classList.remove('bg-indigo-600');
-                btn.classList.add('bg-gray-700/50', 'hover:bg-gray-700');
+            let filteredSessions = allSessions.filter(session => {
+                const sessionDate = getFormattedDate(session.timestamp);
+                const isDateMatch = !dateKey || sessionDate === dateKey;
+                const isSearchMatch = !searchQuery || session.goal.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      session.mode.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      state.subjects.find(s => s.id === session.subjectId)?.name.toLowerCase().includes(searchQuery.toLowerCase());
+                return isDateMatch && isSearchMatch;
             });
-            
-            const selectedBtn = navButtons[page];
-            if (selectedBtn) {
-                selectedBtn.classList.remove('bg-gray-700/50', 'hover:bg-gray-700');
-                selectedBtn.classList.add('bg-indigo-600');
-            }
-            
-            // Run view-specific rendering
-            if (page === 'tasks') renderTasks();
-            if (page === 'history') {
-                updateDateSelector();
-                handleDateChange(D.dateSelector.value || '');
-            }
-            if (page === 'achievements') renderAchievements();
-            if (page === 'progress') renderProgress();
-            if (page === 'settings') renderSubjectManager();
-            
-            window.createLucideIcons(); // Re-render icons after DOM changes
-            saveState();
-        }
 
-        function toggleFullscreenClock() {
-            const isHidden = D.fullscreenClockModal.classList.contains('hidden');
-            if (isHidden) {
-                D.fullscreenClockModal.classList.remove('hidden');
-                document.body.classList.add('modal-open');
-                D.fullscreenBtn.querySelector('i').setAttribute('data-lucide', 'minimize');
-            } else {
-                D.fullscreenClockModal.classList.add('hidden');
-                document.body.classList.remove('modal-open');
-                D.fullscreenBtn.querySelector('i').setAttribute('data-lucide', 'maximize');
+            D.historyList.innerHTML = ''; // Ensure the container is cleared first
+            if (filteredSessions.length === 0) {
+                D.noHistory.classList.remove('hidden');
+                return;
             }
+            D.noHistory.classList.add('hidden');
+
+            // Apply limit for the main timer view (if not on history page)
+            if (limit !== Infinity) {
+                 filteredSessions = filteredSessions.slice(0, limit);
+            }
+
+            // The rest of the rendering logic remains the same:
+            D.historyList.innerHTML = filteredSessions.map(session => {
+                const subject = state.subjects.find(s => s.id === session.subjectId);
+                const subjectName = subject ? subject.name : 'Unknown';
+                const subjectColor = subject ? subject.color : 'gray';
+
+                return `
+                    <div onclick="openModal('${session.id}')" class="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 border-${subjectColor}-500">
+                        <div class="flex-grow min-w-0">
+                            <p class="text-sm font-medium text-gray-300 truncate">${session.goal || 'No goal set'}</p>
+                            <p class="text-xs text-gray-400">
+                                <span class="capitalize text-${subjectColor}-400">${subjectName}</span> | ${session.mode}
+                            </p>
+                        </div>
+                        <p class="text-lg font-bold tabular-nums text-indigo-300 ml-4 flex-shrink-0">${formatTime(session.duration, false)}</p>
+                    </div>
+                `;
+            }).join('');
             window.createLucideIcons();
         }
-        
+
+        function updateDateSelector() {
+            const uniqueDates = [...new Set(state.sessions.map(s => getFormattedDate(s.timestamp)))].sort().reverse();
+            D.dateSelector.innerHTML = '<option value="">All Dates</option>';
+            D.dateSelector.innerHTML += uniqueDates.map(date => 
+                `<option value="${date}">${formatDateForDisplay(date)}</option>`
+            ).join('');
+
+            // Apply event listeners for search input
+            D.historySearch.oninput = () => handleDateChange(D.dateSelector.value || '');
+        }
+
+        function handleDateChange(dateKey) {
+            const dailySessions = state.sessions.filter(s => {
+                const isDateMatch = !dateKey || getFormattedDate(s.timestamp) === dateKey;
+                const isSearchMatch = D.historySearch.value === '' || 
+                                      s.goal.toLowerCase().includes(D.historySearch.value.toLowerCase()) || 
+                                      s.mode.toLowerCase().includes(D.historySearch.value.toLowerCase()) || 
+                                      state.subjects.find(sub => sub.id === s.subjectId)?.name.toLowerCase().includes(D.historySearch.value.toLowerCase());
+                return isDateMatch && isSearchMatch;
+            });
+            const totalDuration = dailySessions.reduce((sum, s) => sum + s.duration, 0);
+
+            const tasksCompletedToday = state.tasks.filter(t => t.completed && getFormattedDate(t.timestamp) === dateKey);
+            const totalTasksCompletedToday = tasksCompletedToday.length;
+
+            if (!dateKey) {
+                D.dailySummaryContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📅</div>
+                        <p class="text-gray-400">Select a date to view your study summary</p>
+                    </div>
+                `;
+            } else {
+                 const completedTasksList = tasksCompletedToday.length > 0 ? tasksCompletedToday.map(t => `
+                    <li class="text-sm text-gray-300 truncate">${t.text.replace(/\[Focus Session\]\s*/, '⏱️ ')}</li>
+                `).join('') : '<li class="text-sm text-gray-400">No tasks completed on this day.</li>';
+                
+                // Group sessions by subject for the daily summary chart (existing logic kept)
+                const subjectData = dailySessions.reduce((acc, s) => {
+                    const subject = state.subjects.find(sub => sub.id === s.subjectId);
+                    const subjectName = subject ? subject.name : 'Unknown';
+                    if (!acc[subjectName]) {
+                        acc[subjectName] = 0;
+                    }
+                    acc[subjectName] += s.duration;
+                    return acc;
+                }, {});
+
+                const subjectBreakdownList = Object.entries(subjectData).sort(([, a], [, b]) => b - a).map(([name, duration]) => {
+                    const subject = state.subjects.find(s => s.name === name);
+                    const colorClass = subject ? `text-${subject.color}-400` : 'text-gray-400';
+                    return `<li class="flex justify-between text-sm text-gray-300"><span class="${colorClass}">${name}</span><span>${formatMinutes(duration)}</span></li>`;
+                }).join('');
+
+                const dailySummaryHTML = `
+                    <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50 mb-6">
+                        <h3 class="text-xl font-bold text-gray-100 mb-2">Summary for ${formatDateForDisplay(dateKey)}</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-3 bg-gray-800 rounded-lg">
+                                <p class="text-sm text-gray-400">Total Focus Time</p>
+                                <p class="text-2xl font-extrabold text-indigo-400">${formatMinutes(totalDuration)}</p>
+                            </div>
+                            <div class="p-3 bg-gray-800 rounded-lg">
+                                <p class="text-sm text-gray-400">Tasks Completed</p>
+                                <p class="text-2xl font-extrabold text-emerald-400">${totalTasksCompletedToday}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="glass-base p-4 rounded-xl bg-gray-800/50 border-gray-700/50">
+                            <h3 class="text-lg font-semibold text-emerald-300 mb-3 flex items-center">
+                                <i data-lucide="clipboard-check" class="w-5 h-5 mr-2"></i> Tasks Completed Today (${tasksCompletedToday.length})
+                            </h3>
+                            <ul class="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                ${completedTasksList}
+                            </ul>
+                        </div>
+                        <div class="glass-base p-4 rounded-xl bg-gray-800/50 border-gray-700/50">
+                            <h3 class="text-lg font-semibold text-indigo-300 mb-3 flex items-center">
+                                <i data-lucide="book" class="w-5 h-5 mr-2"></i> Time by Subject
+                            </h3>
+                            <ul class="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                ${subjectBreakdownList}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                D.dailySummaryContainer.innerHTML = dailySummaryHTML;
+                window.createLucideIcons();
+            }
+
+            // Render the full session list for the selected date/search term
+            renderHistory(D.historySearch.value, dateKey, Infinity);
+        }
+
         function openModal(sessionId) {
             currentSessionId = sessionId;
             const session = state.sessions.find(s => s.id === sessionId);
@@ -1425,17 +1582,16 @@ function setTimerMode(mode) {
             
             const subject = state.subjects.find(s => s.id === session.subjectId);
             const subjectName = subject ? subject.name : 'Unknown Subject';
-            const subjectColor = subject ? subject.color : 'gray';
 
-            let content = `
-                <p class="mb-2"><span class="font-bold">Subject:</span> <span class="text-${subjectColor}-300">${subjectName}</span></p>
-                <p class="mb-2"><span class="font-bold">Duration:</span> ${formatTime(session.duration, true)}</p>
-                <p class="mb-2"><span class="font-bold">Mode:</span> ${session.mode}</p>
-                <p class="mb-2"><span class="font-bold">Date:</span> ${formatDateForDisplay(getFormattedDate(session.timestamp))}</p>
-                <p class="mb-4"><span class="font-bold">Goal:</span> ${session.goal}</p>
+            const modalContent = `
+                <p class="mb-2 text-lg font-bold">${session.goal || 'No goal set'}</p>
+                <p class="mb-1"><strong>Date:</strong> ${formatDateForDisplay(getFormattedDate(session.timestamp))}</p>
+                <p class="mb-1"><strong>Duration:</strong> <span class="text-indigo-400 font-bold">${formatTime(session.duration, false)}</span></p>
+                <p class="mb-1"><strong>Subject:</strong> <span class="capitalize">${subjectName}</span></p>
+                <p class="mb-1"><strong>Mode:</strong> ${session.mode}</p>
             `;
-
-            D.modalContent.innerHTML = content;
+            
+            D.modalContent.innerHTML = modalContent;
             D.detailsModal.classList.remove('hidden');
             document.body.classList.add('modal-open');
             window.createLucideIcons();
@@ -1448,179 +1604,25 @@ function setTimerMode(mode) {
         }
 
         function deleteSession(sessionId) {
-            state.sessions = state.sessions.filter(s => s.id !== sessionId);
-            closeModal();
-            showToast('Session deleted.', 'error');
-            saveState();
-            calculateStats();
-            renderHistory();
-            handleDateChange(D.dateSelector.value || '');
-            renderProgress();
+            if (confirm("Are you sure you want to permanently delete this session?")) {
+                state.sessions = state.sessions.filter(s => s.id !== sessionId);
+                
+                // Also remove the associated task if it exists (prefixed with 's')
+                state.tasks = state.tasks.filter(t => t.id !== ('s' + sessionId));
+                
+                showToast('Session and associated task deleted.', 'success');
+                calculateStats();
+                checkStreakOnLoad(); // Re-check streak to correct dailyTimeLogged
+                updateUI();
+                closeModal();
+                // Re-render history view if on that page
+                if (state.currentPage === 'history') {
+                    updateDateSelector();
+                    handleDateChange(D.dateSelector.value || '');
+                }
+            }
         }
 
-        // HISTORY
-        function renderHistory(filterDate = '', searchTerm = '', limit = 0) {
-    let filteredSessions = [...state.sessions];
-
-    // **[NEW LOGIC START]**: Apply limit ONLY if no date or search filter is active.
-    if (limit > 0 && !filterDate && !searchTerm) {
-        filteredSessions = filteredSessions.slice(0, limit);
-    }
-    // **[NEW LOGIC END]**
-
-    if (filterDate) {
-        filteredSessions = filteredSessions.filter(s => getFormattedDate(s.timestamp) === filterDate);
-    }
-    
-    if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredSessions = filteredSessions.filter(s => 
-            s.goal.toLowerCase().includes(searchLower) ||
-            s.mode.toLowerCase().includes(searchLower) ||
-            (state.subjects.find(sub => sub.id === s.subjectId)?.name || '').toLowerCase().includes(searchLower)
-        );
-    }
-
-    // Now, D.historyList must be cleared regardless of length, 
-    // since this function is also called for the full History Tab.
-    D.historyList.innerHTML = ''; // Ensure the container is cleared first
-
-    if (filteredSessions.length === 0) {
-        // D.historyList is already clear here
-        D.noHistory.classList.remove('hidden');
-        return;
-    }
-    
-    D.noHistory.classList.add('hidden');
-    
-    // The rest of the rendering logic remains the same:
-    D.historyList.innerHTML = filteredSessions.map(session => {
-        const subject = state.subjects.find(s => s.id === session.subjectId);
-        const subjectName = subject ? subject.name : 'Unknown';
-        const subjectColor = subject ? subject.color : 'gray';
-
-        return `
-            <div onclick="openModal('${session.id}')" class="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-700/70 transition-colors border-l-4 border-${subjectColor}-500">
-                <div class="flex-grow min-w-0">
-                    <p class="text-sm font-medium text-gray-300 truncate">${session.goal || 'No goal set'}</p>
-                    <p class="text-xs text-gray-400">
-                        <span class="capitalize text-${subjectColor}-400">${subjectName}</span> | ${session.mode}
-                    </p>
-                </div>
-                <p class="text-lg font-bold tabular-nums text-indigo-300 ml-4 flex-shrink-0">${formatTime(session.duration, false)}</p>
-            </div>
-        `;
-    }).join('');
-    
-    window.createLucideIcons();
-}
-
-        function updateDateSelector() {
-            const uniqueDates = [...new Set(state.sessions.map(s => getFormattedDate(s.timestamp)))].sort().reverse();
-            D.dateSelector.innerHTML = '<option value="">All Dates</option>';
-            D.dateSelector.innerHTML += uniqueDates.map(date => 
-                `<option value="${date}">${formatDateForDisplay(date)}</option>`
-            ).join('');
-            
-            // Apply event listeners for search input
-            D.historySearch.oninput = () => handleDateChange(D.dateSelector.value || '');
-        }
-
-      function handleDateChange(dateKey) {
-    const dailySessions = state.sessions.filter(s => getFormattedDate(s.timestamp) === dateKey);
-    const totalDuration = dailySessions.reduce((sum, s) => sum + s.duration, 0);
-    // Renamed local variable for clarity
-    const totalTasksCompletedToday = state.tasks.filter(t => getFormattedDate(t.completionDate) === dateKey).length;
-
-    if (!dateKey) {
-        // Show All Sessions view
-        D.dailySummaryContainer.innerHTML = ` 
-            <div class="empty-state"> 
-                <div class="empty-state-icon">📚</div> 
-                <p class="text-gray-400">Viewing all sessions. Use the date selector for a daily summary.</p> 
-            </div> 
-        `; 
-        renderHistory('', D.historySearch.value.trim());
-        return;
-    }
-    
-    // 1. Logic to get Completed and Pending Tasks for the History View
-    const tasksCompletedToday = state.tasks.filter(t => getFormattedDate(t.completionDate) === dateKey).sort((a, b) => (a.completionDate || '0').localeCompare(b.completionDate || '0'));
-    const activePendingTasks = state.tasks.filter(t => !t.completed).sort((a, b) => {
-        // Sort pending tasks by priority (high > medium > low)
-        const priorityOrder = { high: 1, medium: 2, low: 3 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
-
-    const completedTasksList = tasksCompletedToday.length > 0 ?
-        tasksCompletedToday.map(t => `<li class="flex items-start text-sm text-gray-300 mb-1 line-through"><i data-lucide="check-circle" class="w-4 h-4 mr-2 mt-1 text-emerald-400 flex-shrink-0"></i><span class="truncate">${t.text}</span></li>`).join('') :
-        '<li class="text-sm text-gray-500 italic">No tasks completed on this day.</li>';
-
-    const pendingTasksList = activePendingTasks.length > 0 ?
-        activePendingTasks.map(t => `<li class="flex items-start text-sm text-gray-300 mb-1"><i data-lucide="list-end" class="w-4 h-4 mr-2 mt-1 text-yellow-400 flex-shrink-0"></i><span class="truncate">${t.text}</span><span class="text-xs ml-auto text-gray-500 capitalize px-2 py-0.5 rounded-full bg-gray-800/50 flex-shrink-0">${t.priority}</span></li>`).join('') :
-        '<li class="text-sm text-gray-500 italic">No active pending tasks. Excellent!</li>';
-    // 2. End Task History Logic
-
-    // Group sessions by subject for the daily summary chart (existing logic kept)
-    const subjectData = dailySessions.reduce((acc, s) => {
-        const subject = state.subjects.find(sub => sub.id === s.subjectId);
-        const subjectName = subject ? subject.name : 'Unknown';
-        if (!acc[subjectName]) {
-            acc[subjectName] = 0;
-        }
-        acc[subjectName] += s.duration;
-        return acc;
-    }, {});
-    
-    const dailySummaryHTML = `
-        <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50 mb-6">
-            <h3 class="text-xl font-bold text-gray-100 mb-2">Summary for ${formatDateForDisplay(dateKey)}</h3>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="p-3 bg-gray-800 rounded-lg">
-                    <p class="text-sm text-gray-400">Total Focus Time</p>
-                    <p class="text-2xl font-extrabold text-indigo-400">${formatMinutes(totalDuration)}</p>
-                </div>
-                <div class="p-3 bg-gray-800 rounded-lg">
-                    <p class="text-sm text-gray-400">Tasks Completed</p>
-                    <p class="text-2xl font-extrabold text-emerald-400">${totalTasksCompletedToday}</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="glass-base p-4 rounded-xl bg-gray-800/50 border-gray-700/50">
-                <h3 class="text-lg font-semibold text-emerald-300 mb-3 flex items-center">
-                    <i data-lucide="clipboard-check" class="w-5 h-5 mr-2"></i>
-                    Tasks Completed Today (${tasksCompletedToday.length})
-                </h3>
-                <ul class="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    ${completedTasksList}
-                </ul>
-            </div>
-            
-            <div class="glass-base p-4 rounded-xl bg-gray-800/50 border-gray-700/50">
-                <h3 class="text-lg font-semibold text-yellow-300 mb-3 flex items-center">
-                    <i data-lucide="clipboard-list" class="w-5 h-5 mr-2"></i>
-                    Active Pending Tasks (${activePendingTasks.length})
-                </h3>
-                <ul class="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    ${pendingTasksList}
-                </ul>
-            </div>
-        </div>
-        <h2 class="text-xl font-semibold text-gray-300 mt-6 mb-3 border-b border-gray-700 pb-2 flex items-center">
-            <i data-lucide="list-todo" class="w-5 h-5 mr-2"></i>
-            Daily Sessions
-        </h2>
-        <div id="daily-sessions-list" class="space-y-3"></div>
-    `;
-
-    D.dailySummaryContainer.innerHTML = dailySummaryHTML;
-    
-    // Rerun history render and icon creation
-    renderHistory(dateKey, D.historySearch.value.trim());
-    window.createLucideIcons();
-}
         // STATS & PROGRESS
         function calculateStats() {
             const now = new Date();
@@ -1628,35 +1630,33 @@ function setTimerMode(mode) {
             const startOfPrevWeek = getPeriodStart('prevWeek', now);
             const startOfMonth = getPeriodStart('month', now);
             const startOfPrevMonth = getPeriodStart('prevMonth', now);
-            
-            let overallTime = 0;
-            let monthlyTime = 0;
-            let weeklyTime = 0;
-            let prevMonthlyTime = 0;
-            let prevWeeklyTime = 0;
-            let dailyTimeInWeek = Array(7).fill(0);
-            let subjectBreakdown = {};
-            let sessionsCount = 0;
 
-            state.sessions.forEach(session => {
+            // Time filtering
+            const allTime = state.sessions.filter(s => s.mode.includes('Focus') || s.mode.includes('Free Mode'));
+            const sessionsCount = allTime.length;
+
+            const weeklyTimeSessions = allTime.filter(s => new Date(s.timestamp) >= startOfWeek);
+            const monthlyTimeSessions = allTime.filter(s => new Date(s.timestamp) >= startOfMonth);
+            const prevWeeklyTimeSessions = allTime.filter(s => new Date(s.timestamp) >= startOfPrevWeek && new Date(s.timestamp) < startOfWeek);
+            const prevMonthlyTimeSessions = allTime.filter(s => new Date(s.timestamp) >= startOfPrevMonth && new Date(s.timestamp) < startOfMonth);
+
+            const overallTime = allTime.reduce((sum, s) => sum + s.duration, 0);
+            const weeklyTime = weeklyTimeSessions.reduce((sum, s) => sum + s.duration, 0);
+            const monthlyTime = monthlyTimeSessions.reduce((sum, s) => sum + s.duration, 0);
+            const prevWeeklyTime = prevWeeklyTimeSessions.reduce((sum, s) => sum + s.duration, 0);
+            const prevMonthlyTime = prevMonthlyTimeSessions.reduce((sum, s) => sum + s.duration, 0);
+
+            // Weekly Breakdown
+            const dailyTimeInWeek = Array(7).fill(0);
+            weeklyTimeSessions.forEach(s => {
+                const dayIndex = (new Date(s.timestamp).getDay() || 7) - 1; // 0=Mon, 6=Sun
+                dailyTimeInWeek[dayIndex] += s.duration;
+            });
+
+            // Subject Breakdown
+            const subjectBreakdown = {};
+            allTime.forEach(session => {
                 const duration = session.duration;
-                const sessionDate = new Date(session.timestamp);
-                
-                overallTime += duration;
-                sessionsCount++;
-
-                // Monthly/Weekly Time
-                if (sessionDate >= startOfMonth) monthlyTime += duration;
-                if (sessionDate >= startOfWeek) {
-                    weeklyTime += duration;
-                    const dayOfWeek = sessionDate.getDay(); // 0=Sun, 1=Mon...
-                    const index = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // Convert to Mon=0, Sun=6
-                    dailyTimeInWeek[index] += duration;
-                }
-                if (sessionDate >= startOfPrevMonth && sessionDate < startOfMonth) prevMonthlyTime += duration;
-                if (sessionDate >= startOfPrevWeek && sessionDate < startOfWeek) prevWeeklyTime += duration;
-                
-                // Subject Breakdown
                 const subjectName = state.subjects.find(s => s.id === session.subjectId)?.name || 'Unknown';
                 subjectBreakdown[subjectName] = (subjectBreakdown[subjectName] || 0) + duration;
             });
@@ -1665,63 +1665,44 @@ function setTimerMode(mode) {
             const tasksCompleted = state.tasks.filter(t => t.completed).length;
             const totalTasks = state.tasks.length;
             const efficiency = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
-            
+
             // Time Stats
             const totalDays = Math.ceil((Date.now() - new Date(state.sessions[state.sessions.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 3600 * 24)) || 1;
             const avgDailyHours = (overallTime / totalDays) / 3600;
             const avgSessionLengthSeconds = sessionsCount > 0 ? overallTime / sessionsCount : 0;
-            
+
             // Most Focused Subject
             const mostFocused = Object.entries(subjectBreakdown).sort(([, a], [, b]) => b - a)[0];
             const mostFocusedSubject = mostFocused ? mostFocused[0] : 'N/A';
             const mostFocusedSubjectRatio = overallTime > 0 ? mostFocused[1] / overallTime : 0;
 
             stats = {
-                overallTime, monthlyTime, weeklyTime, prevMonthlyTime, prevWeeklyTime, dailyTimeInWeek,
-                tasksCompleted, totalTasks, efficiency, avgDailyHours, avgSessionLengthSeconds,
-                subjectBreakdown, mostFocusedSubject, mostFocusedSubjectRatio
+                overallTime,
+                monthlyTime,
+                weeklyTime,
+                prevMonthlyTime,
+                prevWeeklyTime,
+                dailyTimeInWeek,
+                tasksCompleted,
+                totalTasks,
+                efficiency,
+                avgDailyHours,
+                avgSessionLengthSeconds,
+                subjectBreakdown,
+                mostFocusedSubject,
+                mostFocusedSubjectRatio
             };
         }
 
-        function checkDailyStreak() {
-            const now = new Date();
-            const todayKey = getFormattedDate(now.toISOString());
-            const yesterday = new Date(now.getTime());
-            yesterday.setDate(now.getDate() - 1);
-            const yesterdayKey = getFormattedDate(yesterday.toISOString());
-            
-            const lastActiveKey = state.lastActiveDate ? getFormattedDate(state.lastActiveDate) : null;
-            const todayGoalMet = state.dailyTimeLogged >= (state.dailyFocusGoalMinutes * 60);
-
-            // Check if goal met today and the streak hasn't been incremented yet
-            if (todayGoalMet && lastActiveKey !== todayKey) {
-                // If the last active date was yesterday AND the goal was met yesterday, increment the streak
-                const goalMetYesterday = state.sessions.filter(s => getFormattedDate(s.timestamp) === yesterdayKey)
-                    .reduce((total, s) => total + s.duration, 0) >= (state.dailyFocusGoalMinutes * 60);
-
-                if (lastActiveKey === yesterdayKey && goalMetYesterday) {
-                    state.currentDailyStreak++;
-                    state.longestDailyStreak = Math.max(state.longestDailyStreak, state.currentDailyStreak);
-                    showToast(`🔥 Streak continued! Day ${state.currentDailyStreak}!`, 'success');
-                } else if (!lastActiveKey || lastActiveKey < yesterdayKey) {
-                    // Start a new streak if today is the first logged day or a missed day was logged after
-                    state.currentDailyStreak = 1;
-                    state.longestDailyStreak = Math.max(state.longestDailyStreak, state.currentDailyStreak);
-                    showToast('🔥 Streak started! Day 1!', 'success');
-                }
-            } else if (todayGoalMet && state.currentDailyStreak === 0) {
-                // Special case: First day of using the app and meeting the goal
-                 state.currentDailyStreak = 1;
-                 state.longestDailyStreak = Math.max(state.longestDailyStreak, state.currentDailyStreak);
-            }
-        }
-
         function renderProgress() {
-            // Metrics (KPIs)
+            calculateStats(); // Recalculate just in case
+
+            // 1. Metrics Cards
             D.metricsContainer.innerHTML = `
                 <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50">
-                    <p class="text-sm text-gray-400">Total Focused Time</p>
+                    <p class="text-sm text-gray-400">Total Focus</p>
                     <p class="text-2xl font-extrabold text-indigo-400">${formatMinutes(stats.overallTime)}</p>
+                    <p class="text-xs text-gray-500">${stats.sessions.length} sessions</p>
                 </div>
                 <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50">
                     <p class="text-sm text-gray-400">Weekly Focus</p>
@@ -1746,37 +1727,43 @@ function setTimerMode(mode) {
                 <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50">
                     <p class="text-sm text-gray-400">Avg. Session Length</p>
                     <p class="text-2xl font-extrabold text-yellow-400">${formatMinutes(stats.avgSessionLengthSeconds)}</p>
+                    <p class="text-xs text-gray-500">Avg. Daily: ${stats.avgDailyHours.toFixed(1)} hrs</p>
                 </div>
             `;
-            
-            // Weekly Focus Chart
-            renderWeeklyChart(stats.dailyTimeInWeek);
-            
-            // Subject Distribution Chart
-            renderSubjectChart(stats.subjectBreakdown);
-            
-            window.createLucideIcons();
+            window.createLucideIcons(); // Update icons in comparison metrics
+
+            // 2. Weekly Focus Chart
+            renderWeeklyChart();
+
+            // 3. Subject Distribution Chart
+            renderSubjectChart();
         }
 
-        function renderWeeklyChart(data) {
-            const ctx = D.weeklyChart.getContext('2d');
-            
-            if (weeklyChart) {
-                weeklyChart.destroy();
+        function getSubjectColor(subjectName) {
+            const subject = state.subjects.find(s => s.name === subjectName);
+            if (subject) {
+                return `hsl(${SUBJECT_COLORS.indexOf(subject.color) * 360 / SUBJECT_COLORS.length}, 70%, 50%)`;
             }
+            return '#6b7280'; // gray fallback
+        }
 
-            const chartData = data.map(time => time / 3600); // Convert seconds to hours
+        function renderWeeklyChart() {
+            if (weeklyChart) weeklyChart.destroy();
+            
+            const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const data = stats.dailyTimeInWeek.map(s => Math.floor(s / 3600)); // Convert to Hours
 
-            weeklyChart = new Chart(ctx, {
+            weeklyChart = new Chart(D.weeklyChart, {
                 type: 'bar',
                 data: {
-                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    labels: labels,
                     datasets: [{
-                        label: 'Hours Focused',
-                        data: chartData,
-                        backgroundColor: '#6366f1', // Indigo 500
-                        borderRadius: 4,
-                        hoverBackgroundColor: '#4f46e5', // Indigo 600
+                        label: 'Focus Hours',
+                        data: data,
+                        backgroundColor: '#4f46e5',
+                        borderColor: '#6366f1',
+                        borderWidth: 1,
+                        borderRadius: 5,
                     }]
                 },
                 options: {
@@ -1788,32 +1775,22 @@ function setTimerMode(mode) {
                             title: {
                                 display: true,
                                 text: 'Hours',
-                                color: '#9ca3af' // Gray 400
+                                color: '#9ca3af'
                             },
-                            grid: {
-                                color: 'rgba(107, 114, 128, 0.2)' // Gray 500 with opacity
-                            },
-                            ticks: {
-                                color: '#d1d5db' // Gray 300
-                            }
+                            grid: { color: '#374151' },
+                            ticks: { color: '#d1d5db' }
                         },
                         x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#d1d5db' // Gray 300
-                            }
+                            grid: { display: false },
+                            ticks: { color: '#d1d5db' }
                         }
                     },
                     plugins: {
-                        legend: {
-                            display: false
-                        },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `Time: ${context.formattedValue} hours`;
+                                    return `${context.dataset.label}: ${context.parsed.y} hours`;
                                 }
                             }
                         }
@@ -1821,44 +1798,23 @@ function setTimerMode(mode) {
                 }
             });
         }
-        
-        function renderSubjectChart(data) {
-            const ctx = D.subjectChart.getContext('2d');
-            
-            if (subjectChart) {
-                subjectChart.destroy();
-            }
 
-            const subjectNames = Object.keys(data);
-            const subjectTimes = Object.values(data);
+        function renderSubjectChart() {
+            if (subjectChart) subjectChart.destroy();
+
+            const subjectNames = Object.keys(stats.subjectBreakdown);
+            const dataValues = Object.values(stats.subjectBreakdown);
+            const colors = subjectNames.map(name => getSubjectColor(name));
             
-            // Generate colors that map to the state.subjects colors
-            const backgroundColors = subjectNames.map(name => {
-                const subject = state.subjects.find(s => s.name === name);
-                const colorHex = {
-                    'indigo': '#6366f1',
-                    'emerald': '#34d399',
-                    'sky': '#38bdf8',
-                    'yellow': '#facc15',
-                    'red': '#f87171',
-                    'purple': '#c084fc',
-                    'teal': '#2dd4bf',
-                    'pink': '#f472b6',
-                    'Unknown': '#6b7280'
-                }[subject ? subject.color : 'Unknown'] || '#6b7280';
-                return colorHex;
-            });
-            
-            subjectChart = new Chart(ctx, {
+            subjectChart = new Chart(D.subjectChart, {
                 type: 'doughnut',
                 data: {
                     labels: subjectNames,
                     datasets: [{
-                        label: 'Time Focused',
-                        data: subjectTimes,
-                        backgroundColor: backgroundColors,
-                        borderWidth: 1,
-                        borderColor: '#0d1117' // Match body background for separation
+                        label: 'Focus Time (Seconds)',
+                        data: dataValues,
+                        backgroundColor: colors,
+                        hoverOffset: 4
                     }]
                 },
                 options: {
@@ -1890,40 +1846,53 @@ function setTimerMode(mode) {
         function checkAchievements() {
             ACHIEVEMENTS_CONFIG.forEach(ach => {
                 let currentProgress = 0;
-                
                 if (ach.unit === 'minutes') {
                     currentProgress = Math.floor(stats.overallTime / 60);
                 } else if (ach.unit === 'tasks') {
                     currentProgress = stats.tasksCompleted;
                 }
-                
+
                 if (currentProgress >= ach.goal && !state.unlockedAchievements.includes(ach.id)) {
                     state.unlockedAchievements.push(ach.id);
                     showToast(`🏆 Achievement Unlocked: ${ach.name}!`, 'success');
+                    saveState();
                 }
             });
-            saveState();
         }
 
         function renderAchievements() {
+            const currentTotalMinutes = Math.floor(stats.overallTime / 60);
+            const currentTotalTasks = stats.tasksCompleted;
+
             D.trophiesContainer.innerHTML = ACHIEVEMENTS_CONFIG.map(ach => {
                 const isUnlocked = state.unlockedAchievements.includes(ach.id);
-                const progressValue = ach.unit === 'minutes' ? Math.floor(stats.overallTime / 60) : stats.tasksCompleted;
-                const progress = Math.min(100, (progressValue / ach.goal) * 100);
-                const achievedClass = isUnlocked ? 'bg-gray-800/70 border-emerald-500/50' : 'bg-gray-800/30 border-gray-700/50 opacity-70';
-                const iconColor = isUnlocked ? ach.color : 'text-gray-500';
+                let currentProgress = ach.unit === 'minutes' ? currentTotalMinutes : currentTotalTasks;
+                let progress = Math.min(100, (currentProgress / ach.goal) * 100);
+                
+                const statusText = isUnlocked ? 'Unlocked!' : `${progress.toFixed(0)}% Complete`;
+                const progressClass = isUnlocked ? 'bg-emerald-500' : 'bg-indigo-500';
+                const containerClass = isUnlocked ? 'border-emerald-500/50 shadow-emerald-500/30' : 'border-gray-500/50 shadow-indigo-500/30';
+                const iconClass = isUnlocked ? 'text-emerald-400 achievement-pulse' : 'text-gray-400';
 
                 return `
-                    <div class="glass-base p-5 rounded-xl shadow-xl transition-all transform ${achievedClass} ${isUnlocked ? 'ring-2 ring-emerald-500/30' : ''}">
-                        <div class="flex items-center space-x-4 mb-3">
-                            <i data-lucide="${ach.icon}" class="w-8 h-8 ${iconColor} ${isUnlocked ? 'achievement-pulse' : ''}"></i>
-                            <h3 class="text-xl font-bold text-gray-100">${ach.name}</h3>
+                    <div class="glass-base p-5 rounded-2xl shadow-xl border ${containerClass} bg-gray-800/50">
+                        <div class="flex items-start">
+                            <i data-lucide="${ach.icon}" class="w-8 h-8 mr-4 ${iconClass}"></i>
+                            <div class="flex-grow">
+                                <h3 class="text-xl font-bold ${ach.color}">${ach.name}</h3>
+                                <p class="text-sm text-gray-400">${ach.description}</p>
+                                <p class="text-xs text-gray-500 mt-1">Goal: ${ach.goal} ${ach.unit}</p>
+                            </div>
                         </div>
-                        <p class="text-gray-400 text-sm mb-3">${ach.description}</p>
-                        <div class="w-full bg-gray-700 rounded-full h-2.5">
-                            <div class="h-2.5 rounded-full transition-all duration-500 ${isUnlocked ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width: ${progress}%"></div>
+                        <div class="mt-4">
+                            <div class="flex justify-between text-xs font-medium mb-1">
+                                <span class="text-gray-300">${statusText}</span>
+                                <span class="text-gray-400">${isUnlocked ? '' : `(${currentProgress} / ${ach.goal})`}</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div class="${progressClass} h-2.5 rounded-full" style="width: ${progress}%"></div>
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">${progressValue} / ${ach.goal} ${ach.unit}</p>
                     </div>
                 `;
             }).join('');
@@ -1931,121 +1900,77 @@ function setTimerMode(mode) {
         }
 
         // SETTINGS
-        function updateDailyGoal(value) {
-            const goal = parseInt(value);
+        function updateDailyGoal(newGoal) {
+            const goal = parseInt(newGoal);
             if (goal < 5) {
-                state.dailyFocusGoalMinutes = 5;
-                D.dailyGoalInput.value = 5;
-                showToast('Minimum goal is 5 minutes.', 'error');
-            } else {
-                state.dailyFocusGoalMinutes = goal;
-                showToast(`Daily focus goal set to ${goal} minutes.`, 'success');
+                showToast('Goal must be at least 5 minutes.', 'error');
+                D.dailyGoalInput.value = state.dailyFocusGoalMinutes; // Revert
+                return;
             }
+            state.dailyFocusGoalMinutes = goal;
+            showToast(`Daily focus goal set to ${goal} minutes.`, 'success');
             saveState();
-            updateUI(); // Update the streak bar immediately
+            updateUI(); // Update streak progress bar
         }
 
         // DATA MANAGEMENT
         function exportData() {
-            const dataStr = JSON.stringify(state, null, 2);
-            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-
-            const exportFileDefaultName = 'study_tracker_data.json';
-
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileDefaultName);
-            linkElement.click();
-            showToast('Data exported successfully!', 'success');
+            const data = {
+                state: state,
+                stats: stats,
+                timestamp: new Date().toISOString()
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `study_tracker_data_${getFormattedDate(data.timestamp)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Data export initiated.', 'success');
         }
-
-function exportCsvData() {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    const now = new Date();
-    
-    // Helper to escape CSV fields
-    const escapeCsv = (data) => `"${String(data || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-
-    // --- SESSION HISTORY ---
-    csvContent += "---SESSION_HISTORY---\n";
-    const sessionHeaders = ["Date", "Duration (Minutes)", "Subject ID", "Subject Name", "Notes"].join(",");
-    csvContent += sessionHeaders + "\n";
-
-    state.sessions.sort((a, b) => a.timestamp - b.timestamp).forEach(session => {
-        // Assuming getFormattedDate is available here for sessions
-        const date = getFormattedDate(session.timestamp); 
-        const subject = state.subjects.find(sub => sub.id === session.subjectId);
-        const subjectName = subject ? subject.name : 'Unknown';
         
-        const row = [
-            date,
-            session.duration,
-            session.subjectId,
-            escapeCsv(subjectName),
-            escapeCsv(session.notes)
-        ].join(",");
-        csvContent += row + "\n";
-    });
-
-    // --- SUBJECTS LIST ---
-    csvContent += "\n\n---SUBJECTS---\n";
-    const subjectHeaders = ["Subject ID", "Subject Name", "Color"].join(",");
-    csvContent += subjectHeaders + "\n";
-    
-    state.subjects.sort((a, b) => a.id - b.id).forEach(subject => {
-        const row = [
-            subject.id,
-            escapeCsv(subject.name),
-            subject.color
-        ].join(",");
-        csvContent += row + "\n";
-    });
-
-    // --- TASK_LIST (Completed and Pending) ---
-    csvContent += "\n\n---TASK_LIST---\n";
-    const taskHeaders = ["Task ID", "Task Text", "Priority", "Created Date", "Status", "Completion Date"].join(",");
-    csvContent += taskHeaders + "\n";
-    
-    // Sort tasks by creation date
-    state.tasks.sort((a, b) => (a.createdDate || '0').localeCompare(b.createdDate || '0')).forEach(task => {
-        
-        // FIX: Ensure date formatting is robust by replacing the dependency on getFormattedDate 
-        const getTaskDateString = (dateString) => {
-            if (!dateString) return 'N/A';
-            try {
-                // Ensure date formatting is always a simple YYYY-MM-DD string
-                return new Date(dateString).toISOString().split('T')[0];
-            } catch (e) {
-                return 'Invalid Date';
+        function exportCsvData() {
+             const sessions = state.sessions;
+            if (sessions.length === 0) {
+                showToast('No sessions to export.', 'error');
+                return;
             }
-        };
+            
+            const headers = ["ID", "Date", "Time (seconds)", "Time (minutes)", "Subject", "Goal", "Mode"];
+            
+            const rows = sessions.map(session => {
+                const subjectName = state.subjects.find(s => s.id === session.subjectId)?.name || 'Unknown';
+                return [
+                    session.id,
+                    formatDateForDisplay(getFormattedDate(session.timestamp)),
+                    session.duration,
+                    (session.duration / 60).toFixed(2),
+                    subjectName,
+                    `"${session.goal.replace(/"/g, '""')}"`, // Handle quotes in goals
+                    session.mode
+                ];
+            });
 
-        const createdDate = getTaskDateString(task.createdDate);
-        const completionDate = task.completionDate ? getTaskDateString(task.completionDate) : 'Pending';
-        const status = task.completed ? 'COMPLETED' : 'PENDING';
+            let csvContent = headers.join(",") + "\n";
+            rows.forEach(row => {
+                csvContent += row.join(",") + "\n";
+            });
 
-        const row = [
-            `T${task.id}`,
-            escapeCsv(task.text),
-            task.priority || 'low',
-            createdDate,
-            status,
-            completionDate
-        ].join(",");
-        csvContent += row + "\n";
-    });
-
-    // Create the download link and trigger the download
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    // FIX: Using a simple inline format for the filename date to prevent potential issues
-    const fileNameDate = now.toISOString().split('T')[0].replace(/-/g, '');
-    link.setAttribute("download", `study_tracker_data_${fileNameDate}.csv`);
-    document.body.appendChild(link); // Required for Firefox
-    link.click();
-    document.body.removeChild(link);
-}
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `study_tracker_sessions_${getFormattedDate(new Date().toISOString())}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('CSV export initiated.', 'success');
+        }
 
         function importData(event) {
             const file = event.target.files[0];
@@ -2054,17 +1979,22 @@ function exportCsvData() {
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const importedState = JSON.parse(e.target.result);
+                    const importedData = JSON.parse(e.target.result);
                     
-                    if (importedState.sessions && importedState.subjects && importedState.tasks) {
-                        if (confirm("Are you sure you want to overwrite your current data with the imported data?")) {
-                            // Simple merge/overwrite for simplicity. For a real app, merging logic is better.
-                            state = { ...DEFAULT_STATE, ...importedState };
-                            // Recalculate everything after a full import
-                            loadState(); 
-                            showToast('Data imported successfully!', 'success');
-                            switchPage(state.currentPage || 'timer');
-                        }
+                    if (importedData.state) {
+                        // Merge the imported state into the current state
+                        state = { ...state, ...importedData.state };
+                        
+                        // Sanity check: ensure array properties are arrays and not null
+                        if (!Array.isArray(state.subjects)) state.subjects = DEFAULT_SUBJECTS;
+                        if (!Array.isArray(state.sessions)) state.sessions = [];
+                        if (!Array.isArray(state.tasks)) state.tasks = [];
+                        if (!Array.isArray(state.unlockedAchievements)) state.unlockedAchievements = [];
+                        
+                        // Recalculate everything after a full import
+                        loadState(); 
+                        showToast('Data imported successfully! Please check your history and settings.', 'success');
+                        switchPage(state.currentPage || 'timer');
                     } else {
                         showToast('Invalid file format. Please import a valid Study Tracker JSON file.', 'error');
                     }
@@ -2078,9 +2008,8 @@ function exportCsvData() {
         function clearAllData() {
             if (confirm("WARNING: This will permanently delete ALL your sessions, tasks, and settings. Are you absolutely sure you want to continue?")) {
                 localStorage.removeItem(LOCAL_STORAGE_KEY);
-                state = { ...DEFAULT_STATE };
-                // Re-initialize state to default values
-                loadState(); 
+                state = { ...DEFAULT_STATE }; // Re-initialize state to default values
+                loadState();
                 switchPage('timer');
                 showToast('All application data cleared successfully.', 'success');
             }
@@ -2094,50 +2023,118 @@ function exportCsvData() {
             D.musicPlayer.onended = () => {
                 currentSongIndex = (currentSongIndex + 1) % PLAYLIST.length;
                 D.musicPlayer.src = PLAYLIST[currentSongIndex];
-                D.musicPlayer.play().catch(e => console.log("Playback failed (user gesture required).", e));
+                D.musicPlayer.play().catch(e => console.log('Autoplay failed:', e));
+                updateUI();
             };
-            D.musicPlayer.ontimeupdate = updateMusicButton;
-        }
-
-        function updateMusicButton() {
-            const icon = D.musicPlayer.paused ? 'music' : 'pause';
-            D.musicBtn.querySelector('i').setAttribute('data-lucide', icon);
-            D.musicBtn.title = D.musicPlayer.paused ? 'Play Background Music' : 'Pause Background Music';
-            window.createLucideIcons();
         }
 
         function toggleSongPlayback() {
             if (D.musicPlayer.paused) {
-                D.musicPlayer.play()
-                    .then(() => showToast('Background music started.', 'success'))
-                    .catch(e => showToast('Could not start music. Click anywhere on the page first.', 'error'));
+                // To play the audio, the user must have initiated a gesture first (which clicking this button is).
+                D.musicPlayer.play().catch(e => {
+                    showToast('Autoplay blocked. Please try clicking the button again after interacting with the page.', 'error');
+                    console.error('Audio playback failed:', e);
+                });
             } else {
                 D.musicPlayer.pause();
-                showToast('Background music paused.', 'error');
             }
-            updateMusicButton();
+            updateUI(); // To update the music button icon
         }
 
-    // KEYBOARD SHORTCUTS
+        // PAGE NAVIGATION
+        function switchPage(page) {
+            const views = {
+                'timer': D.timerView,
+                'tasks': D.tasksView,
+                'history': D.historyView,
+                'achievements': D.achievementsView,
+                'progress': D.progressView,
+                'settings': D.settingsView
+            };
+
+            const navButtons = {
+                'timer': D.navTimerBtn,
+                'tasks': D.navTasksBtn,
+                'history': D.navHistoryBtn,
+                'achievements': D.navAchievementsBtn,
+                'progress': D.navProgressBtn,
+                'settings': D.navSettingsBtn
+            };
+
+            // Hide all views
+            Object.values(views).forEach(view => view.classList.add('hidden'));
+
+            // Show selected view
+            const selectedView = views[page];
+            if (selectedView) {
+                selectedView.classList.remove('hidden');
+                state.currentPage = page;
+            }
+
+            // Update navigation button styles
+            Object.values(navButtons).forEach(btn => {
+                btn.classList.remove('bg-indigo-600');
+                btn.classList.add('bg-gray-700/50', 'hover:bg-gray-700');
+            });
+
+            const selectedBtn = navButtons[page];
+            if (selectedBtn) {
+                selectedBtn.classList.remove('bg-gray-700/50', 'hover:bg-gray-700');
+                selectedBtn.classList.add('bg-indigo-600');
+            }
+
+            // Run view-specific rendering
+            if (page === 'tasks') renderTasks();
+            if (page === 'history') {
+                updateDateSelector();
+                handleDateChange(D.dateSelector.value || '');
+            }
+            if (page === 'achievements') renderAchievements();
+            if (page === 'progress') renderProgress();
+            if (page === 'settings') renderSubjectManager();
+
+            window.createLucideIcons(); // Re-render icons after DOM changes
+            saveState();
+        }
+
+        function toggleFullscreenClock() {
+            const isHidden = D.fullscreenClockModal.classList.contains('hidden');
+            if (isHidden) {
+                D.fullscreenClockModal.classList.remove('hidden');
+                document.body.classList.add('modal-open');
+                D.fullscreenBtn.querySelector('i').setAttribute('data-lucide', 'minimize');
+            } else {
+                D.fullscreenClockModal.classList.add('hidden');
+                document.body.classList.remove('modal-open');
+                D.fullscreenBtn.querySelector('i').setAttribute('data-lucide', 'maximize');
+            }
+            window.createLucideIcons();
+        }
+
+// --- KEYBOARD SHORTCUTS ---
 document.addEventListener('keydown', (e) => {
-    // FIX: Use a more robust check to ensure keyboard shortcuts are disabled when an editable element is focused.
-    const isEditable = document.activeElement.matches('input, textarea, [contenteditable="true"]');
-    
-    if (!isEditable) {
+    // Only respond to shortcuts if no input or textarea is focused
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+    }
+
+    // Timer View Shortcuts
+    if (state.currentPage === 'timer') {
         // Space: Start/Pause
-        if (e.key === ' ') {
+        if (e.key === ' ' || e.key.toLowerCase() === 'p') {
             e.preventDefault();
             startPauseHandler();
         }
 
-        // S: Stop Session (only if timer is running or paused with time > 0)
-        if (e.key.toLowerCase() === 's' && (state.isRunning || getRemainingTime() > 0)) {
+        // S: Stop Session
+        const getRemaining = getRemainingTime();
+        if (e.key.toLowerCase() === 's' && (state.isRunning || getRemaining > 0)) {
             e.preventDefault();
             stopSession();
         }
 
         // D: Discard Session (only if paused with time > 0 or in pomodoro break)
-        if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemainingTime() > 0) {
+        if (e.key.toLowerCase() === 'd' && !state.isRunning && getRemaining > 0) {
             e.preventDefault();
             discardSession();
         }
@@ -2157,6 +2154,16 @@ document.addEventListener('keydown', (e) => {
         } else if (!D.detailsModal.classList.contains('hidden')) {
             closeModal();
         }
+    }
+});
+
+// --- Browser Focus/Blur and Throttling Correction ---
+document.addEventListener('visibilitychange', () => {
+    // If the document is now visible AND the timer is running, perform an instant update.
+    if (document.visibilityState === 'visible' && state.isRunning) {
+        // Calling updateTimer immediately calculates the time drift 
+        // that occurred while the tab was hidden and corrects the timer state.
+        updateTimer();
     }
 });
 
