@@ -1667,14 +1667,21 @@
             const efficiency = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
 
             // Time Stats
-            const totalDays = Math.ceil((Date.now() - new Date(state.sessions[state.sessions.length - 1]?.timestamp || Date.now()).getTime()) / (1000 * 3600 * 24)) || 1;
+            // FIX: Ensure safe access to the oldest session's timestamp
+            const firstSessionTimestamp = state.sessions.length > 0 
+                ? state.sessions[state.sessions.length - 1].timestamp 
+                : new Date().toISOString();
+                
+            const totalDays = Math.ceil((Date.now() - new Date(firstSessionTimestamp).getTime()) / (1000 * 3600 * 24)) || 1;
+            
             const avgDailyHours = (overallTime / totalDays) / 3600;
             const avgSessionLengthSeconds = sessionsCount > 0 ? overallTime / sessionsCount : 0;
 
             // Most Focused Subject
             const mostFocused = Object.entries(subjectBreakdown).sort(([, a], [, b]) => b - a)[0];
+            // FIX: Use ternary operator to safely handle cases where mostFocused is undefined (no sessions logged)
             const mostFocusedSubject = mostFocused ? mostFocused[0] : 'N/A';
-            const mostFocusedSubjectRatio = overallTime > 0 ? mostFocused[1] / overallTime : 0;
+            const mostFocusedSubjectRatio = overallTime > 0 && mostFocused ? mostFocused[1] / overallTime : 0;
 
             stats = {
                 overallTime,
@@ -1702,7 +1709,7 @@
                 <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50">
                     <p class="text-sm text-gray-400">Total Focus</p>
                     <p class="text-2xl font-extrabold text-indigo-400">${formatMinutes(stats.overallTime)}</p>
-                    <p class="text-xs text-gray-500">${stats.sessions.length} sessions</p>
+                    <p class="text-xs text-gray-500">${state.sessions.length} sessions</p>
                 </div>
                 <div class="glass-base p-4 rounded-xl bg-gray-700/50 border-gray-600/50">
                     <p class="text-sm text-gray-400">Weekly Focus</p>
